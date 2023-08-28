@@ -7,40 +7,9 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="colt:colt:1.2.0" level="project" />
-    <orderEntry type="library" name="org.joml:joml:1.9.3" level="project" />
-    <orderEntry type="module-library">
-      <library>
-        <CLASSES>
-          <root url="file://$MODULE_DIR$/resources" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library>
-        <CLASSES>
-          <root url="jar://$MODULE_DIR$/lib/PNGDecoder.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES />
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library">
-      <library>
-        <CLASSES>
-          <root url="file://$MODULE_DIR$/lib/lwgjl-3.1.2" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES>
-          <root url="file://$MODULE_DIR$/lib/lwgjl-3.1.2" />
-        </SOURCES>
-        <jarDirectory url="file://$MODULE_DIR$/lib/lwgjl-3.1.2" recursive="false" />
-        <jarDirectory url="file://$MODULE_DIR$/lib/lwgjl-3.1.2" recursive="false" type="SOURCES" />
-      </library>
-    </orderEntry>
     <orderEntry type="library" name="R User Library" level="project" />
     <orderEntry type="library" name="R Skeletons" level="application" />
+    <orderEntry type="library" name="lib" level="project" />
+    <orderEntry type="library" name="colt-1.2.0" level="project" />
   </component>
 </module>

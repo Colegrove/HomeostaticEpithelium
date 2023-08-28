@@ -1,16 +1,20 @@
 package Epidermis_Model;
 
-import AgentFramework.FileIO;
-import AgentFramework.GenomeTracker;
-import AgentFramework.Grid3unstackable;
-import AgentFramework.GridDiff3;
-import AgentFramework.Gui.GuiVis;
 
-import static AgentFramework.Utils.GetHSBtoRGB;
+import Epidermis_Model.Genome.GenomeTracker;
+import Framework.Grids.Grid3;
+import Framework.Grids.GridDiff3;
+import Framework.Gui.GuiGridVis;
+import Framework.Tools.FileIO;
+import Framework.Tools.Utils;
+
+//import com.sun.javafx.util.Utils; commented out 25AUG23HLC unclear when this is used, may need to get javafx and point
+
 import static Epidermis_Model.EpidermisConst.*;
-import static java.awt.Color.HSBtoRGB;
 
-import java.io.FileWriter;
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 /**
@@ -19,19 +23,22 @@ import java.util.Random;
 
 
 // Grid specific parameters
-class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
-    final Random RN=new Random();
-    static final int[] divHoodBasal={1,0,0, -1,0,0, 0,0,1, 0,0,-1, 0,1,0}; // Coordinate set for two beside and one above and two front and back [x,y,z,x,y,z...]
+class EpidermisGrid extends Grid3<EpidermisCell> {
+    final Random RN=new Random(EpidermisConst.Replicate*EpidermisConst.RecordTime);
     static final int[] moveHood={1,0,0, -1,0,0, 0,0,1, 0,0,-1, 0,-1,0};
+    static final int[] divHood={1,0,0, -1,0,0, 0,0,1, 0,0,-1, 0,1,0};
     static final int[] inBounds= new int[5];
-    static final double EGF_DIFFUSION_RATE=0.08; //keratinocyte growth factor
-    static final double DECAY_RATE=0.001; //chemical decay rate of growth factors
+    static final int MOVE=1;
+    static final int DIV=2;
+    static final double EGF_DIFFUSION_RATE=0.02739064; //keratinocyte growth factor
+    static final double DECAY_RATE=0.0007718750; //chemical decay rate of growth factors
     static final double SOURCE_EGF=1; //constant level at basement
     static final int AIR_HEIGHT=15; //air, keratinocyte death! (threshold level for placement of keratinocytes essentially)
     static final int CHEMICAL_STEPS=100; // number of times diffusion is looped every tick
+    public int[] divisions = new int[ModelTime*ySize];
+    public int divs = 0;
     static double[][][][] ImageArray = new double[EpidermisConst.ySize][EpidermisConst.xSize][EpidermisConst.zSize][4];
     boolean running;
-    float r_lambda_weekly = 0;
     int xDim;
     int yDim;
     int zDim;
@@ -39,6 +46,7 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
     int[] MeanProlif = new int[EpidermisConst.xSize * EpidermisConst.ySize * EpidermisConst.zSize];
     int[] MeanDeath = new int[EpidermisConst.xSize * EpidermisConst.ySize * EpidermisConst.zSize];
     GenomeTracker<EpidermisCellGenome> GenomeStore;
+    LossReplace Turnover;
     GridDiff3 EGF;
 
     public EpidermisGrid(int x, int y, int z) {
@@ -48,7 +56,8 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
         yDim = y;
         zDim = z;
         EGF = new GridDiff3(x, y, z);
-        GenomeStore = new GenomeTracker<>(new EpidermisCellGenome(0f,0f,1f,""), true, true);
+        GenomeStore = new GenomeTracker<>(new EpidermisCellGenome(0f,0f,1f,"", this), true, true);
+        Turnover = new LossReplace(this, ModelTime, 7);
         PlaceCells();
     }
 
@@ -57,14 +66,24 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
             for (int y = 0; y < AIR_HEIGHT; y++) {
                 for (int z = 0; z < xDim; z++) {
                     if (GetAgent(x, y, z) == null) {
-                        EpidermisCell c = NewAgent(x, y, z);
+                        EpidermisCell c = NewAgentSQ(x, y, z);
                         c.init(KERATINOCYTE, GenomeStore.NewProgenitor()); // Initializes cell types; Uniform Start
                     }
                 }
             }
         }
     }
-
+    public void Correct2(){
+        // Find which cells to correct
+        // Generate list of x,y,z coordinates
+        int pointx = 5;
+        int pointy = 5;
+        int pointz = 0;
+        List<int[]> points = new ArrayList<>();
+        points.add(new int[]{pointx, pointy, pointz});
+        System.out.print(points);
+        // Correct those cells
+    }
 
     public void RunStep() {
         for (int i = 0; i < CHEMICAL_STEPS; i++) {
@@ -75,11 +94,16 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
             MeanProlif(c);
 //            MeanDeath();
         }
-        popSum+=Pop();
+        popSum+=GetPop();
         CleanShuffInc(RN); // Special Sauce
+
+        Turnover.RecordBasalRate("Death");
+        Turnover.RecordBasalRate("Birth");
+        Turnover.RecordTissueRate("Birth");
+        Turnover.RecordTissueRate("Death");
     }
 
-    public void DrawChemicals(GuiVis chemVis, boolean egf, boolean bfgf) {
+    public void DrawChemicals(GuiGridVis chemVis, boolean egf, boolean bfgf) {
         for (int x = 0; x < xDim; x++) {
             for (int y = 0; y < yDim; y++) {
                     if (egf) {
@@ -89,7 +113,7 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
         }
     }
 
-    public void ActivityHeatMap(GuiVis heatVis, EpidermisGrid Epidermis, EpidermisCellVis CellDraw, int[] MeanLife, String heatColor) {
+    public void ActivityHeatMap(GuiGridVis heatVis, EpidermisGrid Epidermis, EpidermisCellVis CellDraw, int[] MeanLife, String heatColor) {
         for(int i=0; i<MeanLife.length; i++){
             if(MeanLife[i]!=0) {
                 heatVis.SetColorHeat(ItoX(i), ItoY(i), MeanLife[i] / (float)EpidermisConst.VisUpdate, heatColor);
@@ -99,7 +123,7 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
         }
     }
 
-    public void LayerVis(GuiVis heatVis, EpidermisGrid Epidermis, EpidermisCellVis CellDraw, int[] MeanLife, String heatColor) {
+    public void LayerVis(GuiGridVis heatVis, EpidermisGrid Epidermis, EpidermisCellVis CellDraw, int[] MeanLife, String heatColor) {
         int[] MeanLayer = new int[EpidermisConst.ySize];
         for(int i=0; i<MeanLife.length; i++){
             int y = ItoY(i);
@@ -126,7 +150,7 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
             }
     }
 
-    public float GetOldestCell(EpidermisGrid Epidermis){
+    public float GetMeanAge(EpidermisGrid Epidermis){
         float Age = 0;
         int aliveCells = 0;
         for (EpidermisCell c: this) {
@@ -138,7 +162,7 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
         return Age/aliveCells;
     }
 
-    public void DrawCellActivity(GuiVis vis, EpidermisGrid Epidermis, EpidermisCellVis CellDraw) {
+    public void DrawCellActivity(GuiGridVis vis, EpidermisGrid Epidermis, EpidermisCellVis CellDraw) {
         long time = System.currentTimeMillis();
         for (int x = 0; x < xDim; x++) {
             for (int y = 0; y < yDim; y++) {
@@ -152,7 +176,7 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
         }
     }
 
-    public void DrawCellPops(GuiVis vis, EpidermisGrid Epidermis, EpidermisCellVis CellDraw){
+    public void DrawCellPops(GuiGridVis vis, EpidermisGrid Epidermis, EpidermisCellVis CellDraw){
         long time = System.currentTimeMillis();
         for (int x = 0; x < xDim; x++) {
             for (int y = 0; y < yDim; y++) {
@@ -166,7 +190,7 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
         }
     }
 
-    public void DrawCellPopsBottom(GuiVis vis, EpidermisGrid Epidermis, EpidermisCellVis CellDraw){
+    public void DrawCellPopsBottom(GuiGridVis vis, EpidermisGrid Epidermis, EpidermisCellVis CellDraw){
         for(int x=0; x < xDim; x++) {
             for(int z=0; z<zDim; z++) {
                 EpidermisCell c = Epidermis.GetAgent(x, 0, z);
@@ -179,7 +203,7 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
         }
     }
 
-    public void DrawCellPopsBottomActivity(GuiVis vis, EpidermisGrid Epidermis, EpidermisCellVis CellDraw) {
+    public void DrawCellPopsBottomActivity(GuiGridVis vis, EpidermisGrid Epidermis, EpidermisCellVis CellDraw) {
         long time = System.currentTimeMillis();
         for (int x = 0; x < xDim; x++) {
             for (int z = 0; z < zDim; z++) {
@@ -193,6 +217,34 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
         }
     }
 
+    public void rglVisualization(){
+        for(int i=0; i < (EpidermisConst.ySize*EpidermisConst.xSize*EpidermisConst.zSize);i++) {
+            EpidermisCell c = GetAgent(i);
+            if (c != null) {
+                String outLine = i + "\t" + c.myGenome.h + "\t" + c.myGenome.s + "\t" + c.myGenome.v + "\t" + 0.8;
+                System.out.println(outLine);
+            }
+        }
+    }
+
+    public void EGFrglVisualization(){
+        double egfCol = 0;
+        for (int x = 0; x < xDim; x++) {
+            for (int z = 0; z < zDim; z++) {
+                egfCol = 0;
+                for (int y = 0; y < yDim; y++) {
+                    egfCol += EGF.GetCurr(x,y,z);
+                }
+                String outLine = x + "\t" + z + "\t" + egfCol;
+                System.out.println(outLine);
+            }
+        }
+    }
+
+    // commented out appears to not be used - 25AUG23 HLC
+    // Utils.HSBtoRGB error wants 4 doubles, but input is 3 floats
+    // Reworked code to allow proper input to HSBtoRGB function. 25AUG23HLC
+
     public void BuildMathematicaArray(){
         for(int i=0; i < (EpidermisConst.ySize*EpidermisConst.xSize*EpidermisConst.zSize);i++){
             EpidermisCell c = GetAgent(i);
@@ -203,9 +255,14 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][2] = 1.0;
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][3] = 0.1;
                 } else {
-                    ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][0] = GetHSBtoRGB(c.myGenome.h,c.myGenome.s,c.myGenome.v)[0];
-                    ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][1] = GetHSBtoRGB(c.myGenome.h,c.myGenome.s,c.myGenome.v)[1];
-                    ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][2] = GetHSBtoRGB(c.myGenome.h,c.myGenome.s,c.myGenome.v)[2];
+//                    double h = (double) c.myGenome.h;
+//                    double s = (double) c.myGenome.s;
+//                    double v = (double) c.myGenome.v;
+//                    double [] rgbvalues = new double[3];
+//                    Utils.HSBtoRGB(h, s, v, rgbvalues);
+                    ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][0] = Utils.GetHSBtoRGB(c.myGenome.h,c.myGenome.s,c.myGenome.v)[0];
+                    ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][1] = Utils.GetHSBtoRGB(c.myGenome.h,c.myGenome.s,c.myGenome.v)[1];
+                    ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][2] = Utils.GetHSBtoRGB(c.myGenome.h,c.myGenome.s,c.myGenome.v)[2];
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][3] = 0.80;
                 }
             } else {
@@ -218,11 +275,34 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
     }
 
     // Inflicting a wound to simulate wound repair...
-    public void inflict_wound(int size){
-        for(int i=0; i < (EpidermisConst.ySize*EpidermisConst.xSize*EpidermisConst.zSize);i++) {
+    public void inflict_wound(){
+        for (int x = xDim/5; x < (xDim/5)*4; x++) {
+            for (int z = zDim/5; z < (zDim/5)*4; z++) {
+                for (int y = 0; y < yDim; y++) {
+                    EpidermisCell c = GetAgent(x,y,z);
+                    if(c!=null){
+                        c.itDead();
+                    }
+                }
+            }
+        }
+//        for(int i=0; i < (EpidermisConst.ySize*EpidermisConst.xSize*EpidermisConst.zSize);i++) {
+//            EpidermisCell c = GetAgent(i);
+//            if(c!=null){
+//                c.itDead();
+//            }
+//        }
+    }
+
+    public void DamageTissueWithUV(double FractionOfDeadCells){
+        for (int i = 0; i < (xDim*zDim*yDim); i++) {
             EpidermisCell c = GetAgent(i);
-            if(c!=null){
-                continue;
+            if(c!=null) {
+                String thisGenome = c.myGenome.GenomeInfoStr();
+                // If P53 Mutation present standard death function
+                if(!thisGenome.contains(".68.") && RN.nextDouble()<FractionOfDeadCells) {
+                    c.itDead();
+                }
             }
         }
     }
@@ -235,19 +315,51 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
         }
     }
 
+    public double GetMeanCellHeight(){
+        int allColumns = 0;
+        for (int x = 0; x < xDim; x++) {
+            for (int z = 0; z < zDim; z++) {
+                int column = 0;
+                for (int y = 0; y < yDim; y++) {
+                    EpidermisCell c = GetAgent(x, y, z);
+                    if (c != null) {
+                        column++;
+                    }
+                }
+                allColumns += column;
+            }
+        }
+        return (allColumns*1.0)/(xDim*zDim);
+    }
+
     public void GetCellPositions(FileIO PositionOut){
         for(int i=0; i < (EpidermisConst.ySize*EpidermisConst.xSize*EpidermisConst.zSize);i++) {
             EpidermisCell c = GetAgent(i);
             if(c!=null){
-                String OutString = ItoX(i) + "," + ItoY(i) + "," + ItoZ(i) + "," + c.myGenome.id + "\n";
+                String OutString = ItoX(i) + "," + ItoY(i) + "," + ItoZ(i) + "," + c.myGenome.IDGetter() + "\n";
                 PositionOut.Write(OutString);
             }
         }
     }
 
+    public String GetDivisionProportion(){
+        double[] OutProportions = new double[yDim];
+        for (int i = 0; i < (ModelTime-1)*yDim; i+=yDim) {
+            for (int y = 0; y < yDim; y++) {
+                OutProportions[y]+=divisions[i+y];
+            }
+        }
+        StringBuilder OutNums = new StringBuilder();
+        for (int y = 0; y < yDim; y++) {
+            String OutNess=OutProportions[y]/divs + "\t";
+            OutNums.append(OutNess);
+        }
+        return OutNums.toString();
+    }
+
     public void ChemicalLoop(){
         //DIFFUSION
-        EGF.Diffuse(EGF_DIFFUSION_RATE,false,0,true, false, true);
+        EGF.Diffuse(EGF_DIFFUSION_RATE);
         //CELL CONSUMPTION
         for (EpidermisCell c: this) {
                 EGF.AddNext(c.Xsq(),c.Ysq(),c.Zsq(), c.KERATINO_EGF_CONSPUMPTION*EGF.GetCurr(c.Xsq(), c.Ysq(), c.Zsq()));
@@ -276,5 +388,46 @@ class EpidermisGrid extends Grid3unstackable<EpidermisCell> {
             EGFCons.append(out);
         }
         System.out.println(EGFCons.toString());
+    }
+
+    public void Correct() {
+        // Find which cells to correct
+        // Generate list of x,y,z coordinates
+        int pointx = 5;
+        int pointy = 5;
+        int pointz = 0;
+        List<int[]> points = new ArrayList<>();
+        points.add(new int[]{5, 4, 0});
+        points.add(new int[]{5, 5, 0});
+        points.add(new int[]{5, 6, 0});
+        points.add(new int[]{4, 3, 0});
+        points.add(new int[]{4, 4, 0});
+        points.add(new int[]{4, 5, 0});
+        points.add(new int[]{4, 6, 0});
+        points.add(new int[]{4, 7, 0});
+        points.add(new int[]{4, 8, 0});
+        points.add(new int[]{6, 4, 0});
+        points.add(new int[]{6, 5, 0});
+        points.add(new int[]{6, 6, 0});
+        points.add(new int[]{6, 7, 0});
+        points.add(new int[]{6, 8, 0});
+        points.add(new int[]{6, 9, 0});
+
+
+        for(int i=0; i<points.size(); i++){
+            int[] coords = points.get(i);
+            for (int j=0; j<3; j++){
+                System.out.print(coords[j] + "\n");
+            }
+            EpidermisCell c = GetAgent(coords[0],coords[1],coords[2]);
+            // edits genome
+            System.out.print("h: " + c.myGenome.h + "\n");
+            System.out.print("s: " + c.myGenome.s + "\n");
+            System.out.print("v: " + c.myGenome.v + "\n");
+            c.myGenome.h = 1;
+            c.myGenome.s = 0.5F;
+            System.out.print(c.myGenome.h + "\n");
+        }
+        // Correct those cells
     }
 }

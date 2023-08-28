@@ -1,6 +1,7 @@
 package Epidermis_Model;
 
-import AgentFramework.Gui.GuiVis;
+
+import Framework.Gui.GuiGridVis;
 
 /**
  * Created by schencro on 3/27/17.
@@ -12,7 +13,7 @@ public class EpidermisCellVis {
     public int[] stationary_vis;
     public int[] movement_vis;
 
-    public void DrawCellonGridPop(GuiVis vis, EpidermisCell theCell){
+    public void DrawCellonGridPop(GuiGridVis vis, EpidermisCell theCell){
         for(int y=0;y<5;y++){
             for(int x=0;x<5;x++){
                 int cVal=stationary_vis[x+y*5];
@@ -21,7 +22,7 @@ public class EpidermisCellVis {
         }
     }
 
-    public void DrawCellonGridPopZ(GuiVis vis, EpidermisCell theCell){
+    public void DrawCellonGridPopZ(GuiGridVis vis, EpidermisCell theCell){
         for(int z=0;z<5;z++){
             for(int x=0;x<5;x++){
                 int cVal=stationary_vis[x+z*5];
@@ -30,7 +31,7 @@ public class EpidermisCellVis {
         }
     }
 
-    public void DrawCellonGrid(GuiVis vis, EpidermisCell theCell){
+    public void DrawCellonGrid(GuiGridVis vis, EpidermisCell theCell){
         switch (theCell.Action) {
             case EpidermisConst.DIVIDE:
                 for(int y=0;y<5;y++){
@@ -64,7 +65,7 @@ public class EpidermisCellVis {
         }
     }
 
-    public void DrawCellonGrid3D(GuiVis vis, EpidermisCell theCell){
+    public void DrawCellonGrid3D(GuiGridVis vis, EpidermisCell theCell){
         switch (theCell.Action) {
             case EpidermisConst.DIVIDE:
                 for(int z=0;z<5;z++){
@@ -98,7 +99,7 @@ public class EpidermisCellVis {
         }
     }
 
-    public void DrawEmptyCell(GuiVis vis, int x, int y){
+    public void DrawEmptyCell(GuiGridVis vis, int x, int y){
         for(int i=0; i<5; i++){
             for(int j=0; j<5; j++){
                 vis.SetColor(i+x*5, j+y*5, 0f, 0f, 0f);

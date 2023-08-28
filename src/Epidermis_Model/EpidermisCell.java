@@ -1,14 +1,14 @@
 package Epidermis_Model;
 
-import AgentFramework.AgentSQ3unstackable;
+import Framework.Grids.AgentSQ3unstackable;
 import cern.jet.random.Poisson;
 import cern.jet.random.engine.DRand;
 import cern.jet.random.engine.RandomEngine;
+import com.sun.org.apache.bcel.internal.generic.NEW;
 
 import java.util.Arrays;
 import java.util.concurrent.ThreadLocalRandom;
 
-import static AgentFramework.Utils.ModWrap;
 import static Epidermis_Model.EpidermisCellGenome.ExpectedMuts;
 import static Epidermis_Model.EpidermisCellGenome.GeneLengths;
 import static Epidermis_Model.EpidermisCellGenome.RN;
@@ -23,25 +23,20 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
     /**
      * parameters that may be changed for cell behavior
      **/
-    double prolif_scale_factor = 0.07610124; //Correction for appropriate proliferation rate (Default = 0.15-0.2 with KERATINO_APOPTOSIS_EGF=0.01)
-    double KERATINO_EGF_CONSPUMPTION = -0.002269758; //consumption rate by keratinocytes
-    double KERATINO_APOPTOSIS_EGF = 0.3358162; //level at which apoptosis occurs by chance (above this and no apoptosis)
-    double DEATH_PROB = 0.01049936; //Overall Death Probability
-    double MOVEPROBABILITY = 0.0; //RN float has to be greater than this to move...
-    double DIVISIONLOCPROB = 0.8315265; // Probability of dividing up vs side to side
-    static int pro_count = 0;
-    static int pro_count_basal = 0;
-    static int loss_count_basal = 0;
-    static int death_count = 0;
-    final static boolean[][] existsArrs=new boolean[10][20];
-    final static int[] colTops=new int[10];
-    static int iRec=0;
+    double prolif_scale_factor = 0.02870462; //Correction for appropriate proliferation rate (Default = 0.15-0.2 with KERATINO_APOPTOSIS_EGF=0.01)
+    double KERATINO_EGF_CONSPUMPTION = -0.006954863; //consumption rate by keratinocytes
+    double KERATINO_APOPTOSIS_EGF = 0.005939094; //level at which apoptosis occurs by chance (above this and no apoptosis)
+    double DEATH_PROB = 0.0038163034; //Overall Death Probability
+    double MOVEPROBABILITY = 0.81996739; //RN float has to be greater than this to move...
+    double DIVISIONLOCPROB = 0.2518617; // Probability of dividing up vs side to side
+    double MUTATION_SCALE_FACTOR = 1; // Adjusts the mutation rates while keeping relative mutation rates the same.
     static int[] dipshit = new int[5];
     static int[] dipshitDiv = new int[5];
-    static int dipshitCount = 0;
     int myType; //cell type
     int Action; //cells action
     static public RandomEngine RNEngine = new DRand();
+    int OldLocation;
+    int NewLocation;
     /**
      * Parameters for cell specific tracking and genome information
      **/
@@ -53,23 +48,6 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
         this.Action = STATIONARY;
         // Storing Genome Reference to Parent and Itself if mutation happened
         this.myGenome = myGenome;
-    }
-
-    // Set coords array using this function
-    // Function gets all cells surrounding it that are empty!! Take-Away
-    public int GetEmptyVNSquares(int x, int y, int z, boolean OnlyEmpty, int[] divHood, int[] inBounds){
-        int finalCount=0;
-        int inBoundsCount = G().SQstoLocalIs(divHood, inBounds, x, y, z, true, false, true); // Gets all inbound indices
-        if(!OnlyEmpty){
-            return inBoundsCount;
-        }
-        for (int i=0; i<inBoundsCount; i++){
-            if(G().GetAgent(inBounds[i]) == null){
-                inBounds[finalCount]=inBounds[i];
-                finalCount++;
-            }
-        }
-        return finalCount;
     }
 
     // Gets where a cell is dividing if it's a basal cell and is proliferating
@@ -100,32 +78,43 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
         int x = Xsq();
         int y = Ysq();
         int z = Zsq();
+        int i = Isq();
         int iDivLoc;
+
+        // TODO Implement change to acquire inBounds for the cell.
 
         // If EGF is low then next double is likely to be higher...Results in no proliferation
         if (myType == KERATINOCYTE && G().RN.nextDouble() > G().EGF.GetCurr(x, y, z) * prolif_scale_factor) {
             return false;
         }
 
-        int divOptions = GetEmptyVNSquares(x, y, z, false, G().divHoodBasal, G().inBounds); // Number of coordinates you could divide into
+        GetCoords(G().divHood, G().DIV);
         iDivLoc = ProlifLoc(); // Where the new cell is going to be (which index) if basal cell
-        if(iDivLoc==0 || iDivLoc==1 || iDivLoc==3 || iDivLoc==2 && y==0){
-            loss_count_basal+=1;
-        }
+
         boolean Pushed = CellPush(iDivLoc);
+
+        if(Pushed!=false && y==0 && (iDivLoc==0 || iDivLoc==1 || iDivLoc==3 || iDivLoc==2)){
+            G().Turnover.RecordLossBasal(); // Record Cell Loss from Pushing
+        }
         if(Pushed==false){
-            return false; // Only false if melanocyte there
+            return false; // Only false if NOTCH mutation
         }
 
-        EpidermisCell newCell = G().NewAgent(G().inBounds[iDivLoc]);
-
-        if (y == 0) {
-            pro_count_basal++;
-        }
+        EpidermisCell newCell = G().NewAgentI(G().inBounds[iDivLoc]);
 
         newCell.init(myType, myGenome.NewChild().PossiblyMutate()); // initializes a new skin cell, pass the cellID for a new value each time.
         myGenome = myGenome.PossiblyMutate(); // Check if this duaghter cell, i.e. the progenitor gets mutations during this proliferation step.
-        pro_count += 1;
+
+        if(newCell.Ysq()==0){
+            G().Turnover.RecordDivideBasal();
+            G().Turnover.RecordDivideTissue();
+        } else {
+            G().Turnover.RecordDivideTissue();
+        }
+
+        G().divisions[G().GetTick()*ySize+Ysq()]++;
+        G().divs++;
+
         return true;
     }
 
@@ -133,6 +122,14 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
         int i = G().inBounds[iDivLoc];
         EpidermisCell c=G().GetAgent(i);
         if(c!=null){
+            if(EpidermisConst.NOTCH1FitnessChanges) {
+                String cellToMoveGenome = c.myGenome.GenomeInfoStr();
+                if (cellToMoveGenome.contains(".44.")) {
+                    if (EpidermisConst.NOTCHBlockProbability > RN.nextDouble()) {
+                        return false;
+                    }
+                }
+            }
             int x = G().ItoX(i);
             int y = G().ItoY(i);
             int z = G().ItoZ(i);
@@ -143,50 +140,53 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
                 colTop++;
                 c=G().GetAgent(x,colTop,z);
             }
-            int ColMax=colTop;
             //move column of cells up
             for(;colTop>y;colTop--){
-//                for (int j = 0; j < G().yDim; j++) {
-//                    existsArrs[iRec][j]=G().GetAgent(x,j,z)==null?false:true;
-//                }
-//                colTops[iRec]=colTop;
-//                iRec++;
-//                iRec=iRec%10;
                 c=(G().GetAgent(x,colTop-1,z));
-                c.Move(x,colTop,z);
+                c.MoveSQ(x,colTop,z);
             }
             if(c.Ysq()>= G().yDim-2){c.itDead();}
             return true;
+
         } else{
             return false;
         }
     }
 
     // Sets the coordinates for a cell that is moving.
-    public int GetMoveCoords() {
+    public int GetCoords(int[] hood, int ACTION) {
         int iMoveCoord=-1;  //when it's time to move, it is the index of coordinate that is picked from Coords array above. -1 == Not Moving
         int finalCount=0;
-        int inBoundsCount = G().SQstoLocalIs(G().moveHood, G().inBounds,Xsq(),Ysq(), Zsq(), true, false, true); // Gets all inbound indices
-        for (int i=0; i<inBoundsCount; i++){
-            if(G().GetAgent(G().inBounds[i]) == null){
-                G().inBounds[finalCount]=G().inBounds[i];
-                finalCount++;
+        int inBoundsCount = G().SQstoLocalIs(hood, G().inBounds, Xsq(),Ysq(), Zsq(), true, false, true); // Gets all inbound indices
+        if(ACTION==G().MOVE) {
+            for (int i = 0; i < inBoundsCount; i++) {
+                if (G().GetAgent(G().inBounds[i]) == null) {
+                    G().inBounds[finalCount] = G().inBounds[i];
+                    finalCount++;
+                }
             }
+            if(finalCount>0&&myType==KERATINOCYTE) {
+                iMoveCoord=G().RN.nextInt(finalCount);
+            }
+            // Return statement is only used for movement. Not division.
+            return iMoveCoord;
+        } else if(ACTION==G().DIV){
+            return -1; // Not used for division but setting G().inBounds.
+        } else{
+            throw new RuntimeException("EpidermisCell.GetCoords() is not working.");
         }
-        if(finalCount>0&&myType==KERATINOCYTE) {
-            iMoveCoord=G().RN.nextInt(finalCount);
-        }
-        return iMoveCoord;
     }
 
     public void itDead(){
         myGenome.DisposeClone(); // Decrements Population
         Dispose();
-        death_count+=1;
+
         G().MeanDeath[Isq()] += 1;
-        if (Ysq()==0){
-            loss_count_basal++;
+
+        if(Ysq()==0){
+            G().Turnover.RecordLossBasal();
         }
+        G().Turnover.RecordLossTissue();
     }
 
     public void CellStep(){
@@ -201,22 +201,39 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
             itDead();
             return;
         }
-        if(RN.nextDouble() < DEATH_PROB){
-            //Random Fucked
-            itDead();
-            return;
+
+        // If doing P53 Fitness
+        if(EpidermisConst.PFiftyThree) {
+            String thisGenome = myGenome.GenomeInfoStr();
+            // If P53 Mutation present standard death function
+            if(thisGenome.contains(".68.")) { //Implement Check for mutation in cell
+                return;
+            // If P53 Mutation NOT present
+            } else {
+                if(RN.nextDouble() < (DEATH_PROB)) {
+                    //Random Fucked
+                    itDead();
+                    return;
+                }
+            }
+        } else {
+            if(RN.nextDouble() < DEATH_PROB){
+                //Random Fucked
+                itDead();
+                return;
+            }
         }
 
         if (G().RN.nextFloat() >= MOVEPROBABILITY) {
-            int iMoveCoord = GetMoveCoords(); // -1 if not moving
+            int iMoveCoord = GetCoords(G().moveHood, G().MOVE); // -1 if not moving
             if (iMoveCoord != -1) {
                 dipshit[ DirectionTracker(G().inBounds[iMoveCoord]) ] ++;
-                Move(G().inBounds[iMoveCoord]); // We are moving
-//                dipshit[iMoveCoord] += 1;
-//                dipshitCount += 1;
+                MoveI(G().inBounds[iMoveCoord]); // We are moving
                 Action = MOVING;
                 if (Ysq() != 0 && y == 0) {
-                    loss_count_basal++;
+                    if (Ysq() > y) {
+                        throw new RuntimeException("Cell is Moving Up.");
+                    }
                 }
             }
         }
@@ -227,6 +244,7 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
         }
 
     }
+
 
     public int DirectionTracker(int NextMoveIndex){
         int x=G().ItoX(NextMoveIndex);
