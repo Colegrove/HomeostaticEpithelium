@@ -141,7 +141,8 @@ public class EpidermisCellGenome extends GenomeInfo<EpidermisCellGenome> {
     @Override
     public EpidermisCellGenome _RunPossibleCorrection(){
         String EmptyGenome = "";
-        return new EpidermisCellGenome(.4722f, 0.6f,.67f, EmptyGenome,theGrid); //green corrected color
+        return new EpidermisCellGenome(h, RN.nextFloat() * 0.3f + 0.6f, RN.nextFloat() * 0.55f + 0.3f, EmptyGenome, theGrid);
+        //return new EpidermisCellGenome(.4722f, 0.6f,.67f, EmptyGenome,theGrid); //green corrected color
         //return new EpidermisCellGenome(.861f, 0.6f,.67f, EmptyGenome,theGrid);
     }
 

@@ -54,21 +54,22 @@ GetData <- function(fileName){
     whiteCells <- subset(df,df$h==0.0)
     otherCells <- subset(df,df$h!=0.0)
     whiteCells$alpha = rep(0.1,length(whiteCells$alpha))
-    otherCells$alpha = otherCells$alpha-0.2
+    #otherCells$alpha = otherCells$alpha-0.2
+    otherCells$alpha = otherCells$alpha
     df <- rbind(whiteCells,otherCells)
     return(df)
 }
 
-UpdateColorscheme <- function(df){ ## adjusts reference cells to colorblind friendly 29Aug23HLC
-  NewH <- 0.861
-  NewS <- 0.6
-  NewV <- 0.67
-  df$h[df$h == 1 & df$s == 1 & df$v == 1]
-  df$h[df$h == 1 & df$s == 1 & df$v == 1] <- NewH
-  df$s[df$h == 1 & df$s == 1 & df$v == 1] <- NewS
-  df$v[df$h == 1 & df$s == 1 & df$v == 1] <- NewV
-  return(df)
-}
+#UpdateColorscheme <- function(df){ ## adjusts reference cells to colorblind friendly 29Aug23HLC
+#  NewH <- 0.861
+#  NewS <- 0.6
+#  NewV <- 0.67
+#  df$h[df$h == 1 & df$s == 1 & df$v == 1]
+#  df$h[df$h == 1 & df$s == 1 & df$v == 1] <- NewH
+#  df$s[df$h == 1 & df$s == 1 & df$v == 1] <- NewS
+#  df$v[df$h == 1 & df$s == 1 & df$v == 1] <- NewV
+#  return(df)
+#}
 
 initializeRGL <- function(theta=0,phi=20,myColor="white"){
     par3d(windowRect = c(0, 0, 1600, 800))
@@ -114,10 +115,10 @@ zDim=xDim
 
 #t25 <- GetData("~/Desktop/100xDim.25yrs.txt")
 t25 <- GetData("VisFile.txt.365.txt")
-#t25 <- GetData("VisFile.txt.10.txt")
+t25 <- GetData("VisFile.txt.2.txt")
 tibble(t25) %>%  ggplot() + geom_point(aes(x = x, y = z, col = rgb(h, s, v, alpha= alpha))) + facet_wrap(~y)
-t25 %>% filter(between(x, 4, 6), between(y, 4, 6), z== 0)
-t25 <- UpdateColorscheme(t25)
+#t25 %>% filter(between(x, 4, 6), between(y, 4, 6), z== 0)
+#t25 <- UpdateColorscheme(t25)
 t25cut <- Subsect(t25,section=1)
 #t50 <- GetData("~/Desktop/100xDim.50yrs.txt")
 #t50cut <- Subsect(t50,section=3)
@@ -141,6 +142,8 @@ view3d(zoom=0.6)
 BigBoxPlot()
 
 rgl.snapshot( "3D.progression.png", fmt = "png", top = TRUE )
+rgl.snapshot( "3D.progression_basal.png", fmt = "png", top = TRUE )
+
 clear3d()
 rgl.close()
 

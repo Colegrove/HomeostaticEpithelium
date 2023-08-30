@@ -17,7 +17,7 @@ import java.util.ArrayList;
 
 //Holds Constants for rest of model
 class EpidermisConst {
-    static int xSize = 10; // keratinocyte modal cell size = 15µm (Proc. Natl. Acad. Sci. USA Vol.82,pp.5390-5394,August1985; YANN BARRANDON and HOWARD GREEN) == volume == 1766.25µm^3
+    static int xSize = 20; // keratinocyte modal cell size = 15µm (Proc. Natl. Acad. Sci. USA Vol.82,pp.5390-5394,August1985; YANN BARRANDON and HOWARD GREEN) == volume == 1766.25µm^3
     // (Sampled area = 1mm-2mm^2); Sampled volume = 4.4*10^8µm^3; Total cells needed for 2mm^2 area with depth of 140µm= 249115cells (xSize = 12456, ySize = 20);
     // For 1mm^2 area with depth of 140µm = 62279cells (xSize = 3114, ySize = 20);
     // Takes forever to reach even a year. Cutting the smallest biopsy into a quarter (1/4) = 15570cells (xSize = 1038, ySize = 20)
@@ -31,12 +31,21 @@ class EpidermisConst {
     static final int MOVING = 4; //Attribute if cell is moving
 
     static int years = 1; // time in years.
-    static int RecordTime = years * 365;
-    //static int RecordTime = 10;
+    //static int RecordTime = years * 365;
+    static int RecordTime = 2;
+    static int[] RecordTimeArray = {2,10,100,365};
     static int ModelTime = years * 365 + 10; // Time in days + 10 days after time for recording! e.v. 65 years = 23725
     //static int ModelTime = 365;
     static final int VisUpdate = 7; // Timestep interval to update Division and Death, etc.
     static int Replicate = 1; // Replicate number to be multiplied by the RecordTime to set the seed
+
+    /**
+     * Correction parameters 30Aug23HLC
+     */
+    static int microNeedles = 4; // Microneedle injection sites: square value for total number of needles
+    static double margin_ratio = 0.1; // Margins around tissue where microneedles are not injected.
+    static Integer needleSpacing = null; // A defined distance between adjacent microneedles in cellular distance (null for default spacing)
+    static double correctionEfficiency = 0.9; // The probability that a cell in range of an injection site is corrected.
 
     /**
      * Mutation Rate Set Options
@@ -285,30 +294,31 @@ public class Epidermis_Main {
             if(BottomVisMove!=null){Epidermis.DrawCellPopsBottomActivity(BottomVisMove, Epidermis, CellDraw);}
             if(EGFVis!=null){Epidermis.DrawChemicals(EGFVis, true, false);} // 3D Good
 
-
-            // Use this to get the information for 3D visualizations for OpenGL
-            if(EpidermisConst.GetImageData && Epidermis.GetTick() == EpidermisConst.RecordTime){
-                Epidermis.BuildMathematicaArray();
-                FileIO VisOut = new FileIO(Image_file + "." + Epidermis.GetTick() + ".txt", "w");
-                for(int x=0; x < EpidermisConst.xSize;x++){
-                    for(int y=0; y < EpidermisConst.ySize;y++){
-                        for(int z=0; z < EpidermisConst.zSize;z++){
-                            //if (Epidermis.ImageArray[y][x][z][0] != 0.0f && Epidermis.ImageArray[y][x][z][1] != 0.0f && Epidermis.ImageArray[y][x][z][2] != 0.0f && Epidermis.ImageArray[y][x][z][3] != 0.0f){
+            for (int i=0; i< EpidermisConst.RecordTimeArray.length; i++) {
+                int Time = EpidermisConst.RecordTimeArray[i];
+                // Use this to get the information for 3D visualizations for OpenGL
+                if (EpidermisConst.GetImageData && Epidermis.GetTick() == Time) {
+                    Epidermis.BuildMathematicaArray();
+                    FileIO VisOut = new FileIO(Image_file + "." + Epidermis.GetTick() + ".txt", "w");
+                    for (int x = 0; x < EpidermisConst.xSize; x++) {
+                        for (int y = 0; y < EpidermisConst.ySize; y++) {
+                            for (int z = 0; z < EpidermisConst.zSize; z++) {
+                                //if (Epidermis.ImageArray[y][x][z][0] != 0.0f && Epidermis.ImageArray[y][x][z][1] != 0.0f && Epidermis.ImageArray[y][x][z][2] != 0.0f && Epidermis.ImageArray[y][x][z][3] != 0.0f){
                                 String outLine =
-                                    x + "\t" + z + "\t" + y + "\t" +
-                                    Epidermis.ImageArray[y][x][z][0] + "\t" + Epidermis.ImageArray[y][x][z][1] +
-                                            "\t" + Epidermis.ImageArray[y][x][z][2] + "\t" + Epidermis.ImageArray[y][x][z][3] + "\n";
+                                        x + "\t" + z + "\t" + y + "\t" +
+                                                Epidermis.ImageArray[y][x][z][0] + "\t" + Epidermis.ImageArray[y][x][z][1] +
+                                                "\t" + Epidermis.ImageArray[y][x][z][2] + "\t" + Epidermis.ImageArray[y][x][z][3] + "\n";
                                 System.out.print(outLine);
                                 VisOut.Write(outLine);
                             }
-                        //}
+                            //}
+                        }
                     }
+
+                    VisOut.Close();
+                    System.out.println("Done");
                 }
-
-                VisOut.Close();
-                System.out.println("Done");
             }
-
 //            if(EpidermisConst.GetImageData==true && (Epidermis.GetTick() / 365f == 25 || Epidermis.GetTick() / 365f == 50 || Epidermis.GetTick() / 365f == 75)){
 //                System.out.println(new DecimalFormat("#.0").format((Epidermis.GetTick() / 365f)));
 //                Epidermis.rglVisualization();

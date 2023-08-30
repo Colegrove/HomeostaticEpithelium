@@ -78,10 +78,55 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
         }
     }
 
-    public void GenerateCorrectionPoints(){
-        for(int i=0; i < 5; i++){
-            CorrectionPoints.add(new int[]{i,0,i});
+    public void GenerateCorrectionPoints(){ // Adds as an int array coordinates of the desired correction locations. 30Aug23HLC
+
+        int planeSize = xSize;
+        int maxCoordinate = microNeedles-1;
+        int margin = (int) (planeSize*margin_ratio);
+        int distanceX, distanceZ;
+        if(needleSpacing != null){ // set spacing if predefined.
+            distanceX = needleSpacing;
+            distanceZ = needleSpacing;
         }
+        else{ // Calculate default spacing based on available space and microneedle count.
+            distanceX = ((planeSize-1) - 2 * margin) / maxCoordinate;
+            distanceZ = ((planeSize-1) - 2 * margin) / maxCoordinate;
+        }
+        // Calculate initial offset to center the points
+        int offsetX = (planeSize - (microNeedles - 1) * distanceX) / 2;
+        int offsetZ = (planeSize - (microNeedles - 1) * distanceZ) / 2;
+
+        // Check if any points exceed the specified margins
+        boolean xExceedsMargin = false;
+        boolean zExceedsMargin = false;
+        for (int i=0; i<microNeedles; i++){
+            if (offsetX + i * distanceX < margin || offsetX + i * distanceX > planeSize - margin){
+                xExceedsMargin = true;
+                break;
+            }
+        }
+        for (int j=0; j<microNeedles; j++){
+            if (offsetZ + j * distanceZ < margin || offsetZ + j * distanceZ > planeSize - margin){
+                zExceedsMargin = true;
+            }
+        }
+
+        if (xExceedsMargin || zExceedsMargin){
+            throw new IllegalArgumentException("Microneedle spacing is not possible due to insufficient space within the tissue section.\n");
+        }
+        for (int i=0; i < microNeedles; i++){
+            for (int j=0; j < microNeedles; j++){
+                int pointx = offsetX + i * distanceX;
+                int pointz = offsetZ + j * distanceZ;
+                CorrectionPoints.add(new int[]{pointx,0,pointz});
+            }
+        }
+        for(int i=0; i< CorrectionPoints.size(); i++){
+            System.out.print("Point i= " + i + " x = " + CorrectionPoints.get(i)[0] + " z= " + CorrectionPoints.get(i)[2] + "\n");
+        }
+//        for(int i=0; i < 5; i++){
+//            CorrectionPoints.add(new int[]{i,0,i});
+//        }
     }
 
     public void RunStep() {
