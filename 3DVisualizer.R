@@ -38,9 +38,11 @@ redraw <- function(mySpheres, i, LineData){
 	return(mySpheres)
 }
 
-rgl.open()
+#rgl.open()  depreciated changed to open3d() 25AUG23HLC
+open3d()
 view3d(35,30)
-rgl.bg(color="black")
+#rgl.bg(color="black") depreciated changed to bg3d
+bg3d(color='black')
 
 mySpheres <- initialize()
 i = 1

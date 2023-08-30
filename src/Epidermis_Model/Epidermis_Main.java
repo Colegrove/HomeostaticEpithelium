@@ -32,8 +32,9 @@ class EpidermisConst {
 
     static int years = 1; // time in years.
     static int RecordTime = years * 365;
-    //static int ModelTime = years * 365 + 10; // Time in days + 10 days after time for recording! e.v. 65 years = 23725
-    static int ModelTime = 365;
+    //static int RecordTime = 10;
+    static int ModelTime = years * 365 + 10; // Time in days + 10 days after time for recording! e.v. 65 years = 23725
+    //static int ModelTime = 365;
     static final int VisUpdate = 7; // Timestep interval to update Division and Death, etc.
     static int Replicate = 1; // Replicate number to be multiplied by the RecordTime to set the seed
 
@@ -74,6 +75,7 @@ class EpidermisConst {
     static final boolean PFiftyThree = false; // Whether to perform P53 Fitness testing through turnind Random Death Prob off.
     static final boolean PFiftyThreeSunDays = false; // Whether to include a sun days UV damage rate.
     static final boolean NOTCH1FitnessChanges = true; // Whether to run NOTCH1 Fitness Changes.
+
 }
 
 public class Epidermis_Main {
@@ -203,15 +205,19 @@ public class Epidermis_Main {
         int SunDayCounter=0;
         int[] SunTimes=new int[EpidermisConst.SunDays];
 
+        Epidermis.GenerateCorrectionPoints(); // method to generate a list of coordinates for correction 29aug23HLC
+
         TickRateTimer tickIt = new TickRateTimer();
         while(Epidermis.GetTick() < EpidermisConst.ModelTime){
 
 //            tickIt.TickPause(60); // Adjusting a frame rate
 
-            if(Epidermis.GetTick() == 1){
-                Epidermis.Correct(); // Epidermis.Grid function
+            if(Epidermis.GetTick() == 1){ // correction timestep - triggers boolean for correction 29aug23HLC
+                EpidermisGrid.corrected = false;
             }
+
             // Main Running of the steps within the model
+
             Epidermis.RunStep();
 
             /*

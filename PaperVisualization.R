@@ -3,8 +3,13 @@
 # Created by: schencro
 # Created on: 12/6/17
 
+## Edits made 29Aug23HLC
+
 library(rgl)
 library(reshape2)
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
 
 # RGL XYZ correspond to vertices...such that x1,y1,z1 are split by x=c(),y=(),z=()
 # in this way it's a very R fashion. Can do complex shapes with this method. x y or z
@@ -44,7 +49,8 @@ Subsect <- function(df, section=1){
 
 GetData <- function(fileName){
     df <- read.csv(fileName, header=F, sep="\t")
-    colnames(df)<-c("i","h","s","v","alpha")
+    #colnames(df)<-c("i","h","s","v","alpha")
+    colnames(df)<-c("x","z","y","h","s","v","alpha") ## output data is "x,z,y" not "i" 29aug23HLC
     whiteCells <- subset(df,df$h==0.0)
     otherCells <- subset(df,df$h!=0.0)
     whiteCells$alpha = rep(0.1,length(whiteCells$alpha))
@@ -53,17 +59,31 @@ GetData <- function(fileName){
     return(df)
 }
 
+UpdateColorscheme <- function(df){ ## adjusts reference cells to colorblind friendly 29Aug23HLC
+  NewH <- 0.861
+  NewS <- 0.6
+  NewV <- 0.67
+  df$h[df$h == 1 & df$s == 1 & df$v == 1]
+  df$h[df$h == 1 & df$s == 1 & df$v == 1] <- NewH
+  df$s[df$h == 1 & df$s == 1 & df$v == 1] <- NewS
+  df$v[df$h == 1 & df$s == 1 & df$v == 1] <- NewV
+  return(df)
+}
+
 initializeRGL <- function(theta=0,phi=20,myColor="white"){
     par3d(windowRect = c(0, 0, 1600, 800))
     view3d(theta,phi)
-    rgl.bg(color=myColor)
+    bg3d(color=myColor)
 }
 
 placeCells <- function(theData=data.frame(), adjustx=0, adjustz=0, adjusty = 0, myAlpha=1.0, radius=0.8){
-    x=SQtoX(theData$i) + adjustx
-    z=SQtoZ(theData$i) + adjustz
-    y=SQtoY(theData$i) + adjusty
-    rgl.spheres(x=x,z=z,y=y,radius=radius,color=hsv(theData$h,theData$s,theData$v),alpha=myAlpha)
+    #x=SQtoX(theData$i) + adjustx
+    #z=SQtoZ(theData$i) + adjustz
+    #y=SQtoY(theData$i) + adjusty
+    x=theData$x + adjustx
+    z=theData$z + adjustz
+    y=theData$y + adjusty
+    spheres3d(x=x,y=y,z=z,radius=radius,color=hsv(theData$h,theData$s,theData$v),alpha=myAlpha)
 }
 
 BigBoxPlot <- function(){
@@ -92,12 +112,17 @@ xDim=100
 yDim=20
 zDim=xDim
 
-t25 <- GetData("~/Desktop/100xDim.25yrs.txt")
+#t25 <- GetData("~/Desktop/100xDim.25yrs.txt")
+t25 <- GetData("VisFile.txt.365.txt")
+#t25 <- GetData("VisFile.txt.10.txt")
+tibble(t25) %>%  ggplot() + geom_point(aes(x = x, y = z, col = rgb(h, s, v, alpha= alpha))) + facet_wrap(~y)
+t25 %>% filter(between(x, 4, 6), between(y, 4, 6), z== 0)
+t25 <- UpdateColorscheme(t25)
 t25cut <- Subsect(t25,section=1)
-t50 <- GetData("~/Desktop/100xDim.50yrs.txt")
-t50cut <- Subsect(t50,section=3)
-t75 <- GetData("~/Desktop/100xDim.75yrs.txt")
-t75cut <- Subsect(t75,section=2)
+#t50 <- GetData("~/Desktop/100xDim.50yrs.txt")
+#t50cut <- Subsect(t50,section=3)
+#t75 <- GetData("~/Desktop/100xDim.75yrs.txt")
+#t75cut <- Subsect(t75,section=2)
 
 #drawCells
 initializeRGL()
@@ -115,14 +140,17 @@ view3d(zoom=0.6)
 
 BigBoxPlot()
 
-rgl.snapshot( "~/Desktop/3D.progression.png", fmt = "png", top = TRUE )
-rgl.clear()
+rgl.snapshot( "3D.progression.png", fmt = "png", top = TRUE )
+clear3d()
 rgl.close()
 
 #---End Paper Visualization---#
 
+
+
+
 #---Movie Picture Time---#
-GetData <- function(fileName){
+GetData2 <- function(fileName){
     df <- read.csv(fileName, header=F, sep="\t")
     colnames(df)<-c("i","h","s","v","alpha","time")
     df$time <- round(df$time,2)

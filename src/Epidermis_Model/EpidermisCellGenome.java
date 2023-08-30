@@ -72,6 +72,7 @@ public class EpidermisCellGenome extends GenomeInfo<EpidermisCellGenome> {
         this.theGrid = theGrid;
     }
 
+    //
     @Override
     public EpidermisCellGenome _RunPossibleMutation() {
         StringBuilder MutsObtained = new StringBuilder();
@@ -122,18 +123,26 @@ public class EpidermisCellGenome extends GenomeInfo<EpidermisCellGenome> {
             } else {
                 return null; // If No Mutation Occurs
             }
-        } else {
-            if(RN.nextDouble()<QuickMutRate){
+        }else {
+            if(RN.nextDouble()<QuickMutRate) {
                 String EmptyGenome = "";
                 if (h == 0f && s == 0f && v == 1f) {
-                    return new EpidermisCellGenome(RN.nextFloat(), 1f , 0.75f, EmptyGenome, theGrid);
+                    return new EpidermisCellGenome(RN.nextFloat(), 1f, 0.75f, EmptyGenome, theGrid);
                 } else {
-                    return new EpidermisCellGenome(h, RN.nextFloat()*0.3f+0.6f, RN.nextFloat()*0.55f+0.3f, EmptyGenome, theGrid);
+                    return new EpidermisCellGenome(h, RN.nextFloat() * 0.3f + 0.6f, RN.nextFloat() * 0.55f + 0.3f, EmptyGenome, theGrid);
                 }
             } else {
                 return null;
             }
         }
+    }
+
+    // Function to create a new genome with a specific color profile for corrected cells in the grid 28Aug23HLC
+    @Override
+    public EpidermisCellGenome _RunPossibleCorrection(){
+        String EmptyGenome = "";
+        return new EpidermisCellGenome(.4722f, 0.6f,.67f, EmptyGenome,theGrid); //green corrected color
+        //return new EpidermisCellGenome(.861f, 0.6f,.67f, EmptyGenome,theGrid);
     }
 
     @Override
@@ -185,7 +194,9 @@ public class EpidermisCellGenome extends GenomeInfo<EpidermisCellGenome> {
         } else if (Selected==5){
             // Set 6: Mean Mutation Rate = 3.2e10-8
             ExpectedMuts = new double[]{3.5,0.000118224,0.000189166,4.98E-05,3.92E-05,3.33E-05,0.000510712,0.000104898,0.000137149,5.58E-05,0.000104615,7.27E-05,2.98E-05,2.53E-05,4.74E-05,1.10E-05,9.74E-05,0.000126792,7.27E-05,0.000169609,0.000145683,7.91E-05,8.05E-05,0.000105157,4.35E-05,7.10E-05,0.000531406,0.000715913,4.33E-05,5.68E-05,5.53E-05,5.74E-05,0.000260489,0.000138443,0.000179256,1.52E-05,4.55E-05,7.44E-05,4.09E-05,2.03E-05,0.000113506,0.000411201,0.000188292,4.35E-05,0.000209336,0.000270684,0.000230575,1.52E-05,0.000201038,4.00E-05,0.000133732,0.000142641,0.000190685,0.00030083,9.46E-05,2.25E-05,0.000231861,6.86E-05,7.01E-05,0.000144961,0.000127949,0.000218286,0.00012389,5.13E-05,5.20E-05,3.88E-05,0.000268928,2.46E-05,2.29E-05,5.99E-05,0.000154027};
-        } else if(Selected==6){
+        }
+        // Added 25Aug23HLC no mutations occurring
+        else if(Selected==6){
             // Set 7: Mean Mutation Rate = 0
             ExpectedMuts = new double[]{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
         } else {

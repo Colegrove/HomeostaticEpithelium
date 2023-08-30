@@ -49,6 +49,10 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
     LossReplace Turnover;
     GridDiff3 EGF;
 
+    static boolean corrected = true; // changes to false during correction timestep and changes back to true afterword
+                                    // so no further correction occurs 29Aug23HLC
+    static List<int[]> CorrectionPoints = new ArrayList<>(); // create a list of coordinates for corrected cells 29Aug23HLC
+
     public EpidermisGrid(int x, int y, int z) {
         super(x,y,z,EpidermisCell.class);
         running = false;
@@ -73,27 +77,25 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
             }
         }
     }
-    public void Correct2(){
-        // Find which cells to correct
-        // Generate list of x,y,z coordinates
-        int pointx = 5;
-        int pointy = 5;
-        int pointz = 0;
-        List<int[]> points = new ArrayList<>();
-        points.add(new int[]{pointx, pointy, pointz});
-        System.out.print(points);
-        // Correct those cells
+
+    public void GenerateCorrectionPoints(){
+        for(int i=0; i < 5; i++){
+            CorrectionPoints.add(new int[]{i,0,i});
+        }
     }
 
     public void RunStep() {
         for (int i = 0; i < CHEMICAL_STEPS; i++) {
             ChemicalLoop();
         }
+        System.out.print("before: " + corrected + "\n");
         for (EpidermisCell c: this) {
             c.CellStep();
             MeanProlif(c);
 //            MeanDeath();
         }
+        System.out.print("after: " + corrected + "\n");
+        corrected = true; // after first step completed - corrected -> true allows for no further correction 29aug23HLC
         popSum+=GetPop();
         CleanShuffInc(RN); // Special Sauce
 
@@ -249,23 +251,18 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
         for(int i=0; i < (EpidermisConst.ySize*EpidermisConst.xSize*EpidermisConst.zSize);i++){
             EpidermisCell c = GetAgent(i);
             if (c != null){
-                if(c.myGenome.h ==1.0){
+                if(c.myGenome.h ==1.0){ // Note: Reference (non-mutant) cells returned (1,1,1,0.1) - 29Aug23HLC
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][0] = 1.0;
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][1] = 1.0;
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][2] = 1.0;
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][3] = 0.1;
                 } else {
-//                    double h = (double) c.myGenome.h;
-//                    double s = (double) c.myGenome.s;
-//                    double v = (double) c.myGenome.v;
-//                    double [] rgbvalues = new double[3];
-//                    Utils.HSBtoRGB(h, s, v, rgbvalues);
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][0] = Utils.GetHSBtoRGB(c.myGenome.h,c.myGenome.s,c.myGenome.v)[0];
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][1] = Utils.GetHSBtoRGB(c.myGenome.h,c.myGenome.s,c.myGenome.v)[1];
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][2] = Utils.GetHSBtoRGB(c.myGenome.h,c.myGenome.s,c.myGenome.v)[2];
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][3] = 0.80;
                 }
-            } else {
+            } else { // note: null (dead) cells are returned as 0,0,0,0 - 29AUG23HLC
                 ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][0] = 0.0;
                 ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][1] = 0.0;
                 ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][2] = 0.0;
@@ -388,46 +385,5 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
             EGFCons.append(out);
         }
         System.out.println(EGFCons.toString());
-    }
-
-    public void Correct() {
-        // Find which cells to correct
-        // Generate list of x,y,z coordinates
-        int pointx = 5;
-        int pointy = 5;
-        int pointz = 0;
-        List<int[]> points = new ArrayList<>();
-        points.add(new int[]{5, 4, 0});
-        points.add(new int[]{5, 5, 0});
-        points.add(new int[]{5, 6, 0});
-        points.add(new int[]{4, 3, 0});
-        points.add(new int[]{4, 4, 0});
-        points.add(new int[]{4, 5, 0});
-        points.add(new int[]{4, 6, 0});
-        points.add(new int[]{4, 7, 0});
-        points.add(new int[]{4, 8, 0});
-        points.add(new int[]{6, 4, 0});
-        points.add(new int[]{6, 5, 0});
-        points.add(new int[]{6, 6, 0});
-        points.add(new int[]{6, 7, 0});
-        points.add(new int[]{6, 8, 0});
-        points.add(new int[]{6, 9, 0});
-
-
-        for(int i=0; i<points.size(); i++){
-            int[] coords = points.get(i);
-            for (int j=0; j<3; j++){
-                System.out.print(coords[j] + "\n");
-            }
-            EpidermisCell c = GetAgent(coords[0],coords[1],coords[2]);
-            // edits genome
-            System.out.print("h: " + c.myGenome.h + "\n");
-            System.out.print("s: " + c.myGenome.s + "\n");
-            System.out.print("v: " + c.myGenome.v + "\n");
-            c.myGenome.h = 1;
-            c.myGenome.s = 0.5F;
-            System.out.print(c.myGenome.h + "\n");
-        }
-        // Correct those cells
     }
 }

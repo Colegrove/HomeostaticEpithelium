@@ -6,7 +6,9 @@ import cern.jet.random.engine.DRand;
 import cern.jet.random.engine.RandomEngine;
 import com.sun.org.apache.bcel.internal.generic.NEW;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static Epidermis_Model.EpidermisCellGenome.ExpectedMuts;
@@ -37,6 +39,7 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
     static public RandomEngine RNEngine = new DRand();
     int OldLocation;
     int NewLocation;
+
     /**
      * Parameters for cell specific tracking and genome information
      **/
@@ -190,6 +193,11 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
     }
 
     public void CellStep(){
+
+        if(!EpidermisGrid.corrected){
+            Correct(); // Add step to correct specific cells 28Aug23HLC
+        }
+
         int x=Xsq();int y=Ysq();int z=Zsq(); // Get discrete x and y coordinates
         Action = STATIONARY;
         if (y>=G().AIR_HEIGHT){
@@ -256,6 +264,26 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
         if (dz == 1) { return 2; }
         if (dz == -1) { return 3; }
         return 4;
+    }
+
+
+    public void Correct() { //method to use the list of coordinate points generated in EpidermisGrid and perform the correction 29aug23HLC
+
+        for(int i=0; i<EpidermisGrid.CorrectionPoints.size(); i++){
+            int[] coords = EpidermisGrid.CorrectionPoints.get(i);
+
+            // find the cells associated with the coordinates in the list
+            if(coords[0] != this.Xsq() || coords[1] != this.Ysq() || coords[2] != this.Zsq()){
+                continue;
+            }
+            else {
+                itDead(); // kill and remove the current cell
+                EpidermisCell newCell = G().NewAgentPT(coords[0],coords[1],coords[2]); // adds a new cell
+                newCell.init(myType, myGenome.NewChild().PerformCorrection()); // initializes a new skin cell
+                //myGenome = myGenome.PerformCorrection(); // Appears to be redunant from line above: cells still become corrected
+                                                        // keeping line in case this may be for genome tracking purposes
+            }
+        }
     }
 
 //    // Builds my genome information for data analysis

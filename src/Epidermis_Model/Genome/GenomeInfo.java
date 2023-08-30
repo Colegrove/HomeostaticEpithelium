@@ -1,5 +1,6 @@
 package Epidermis_Model.Genome;
 
+import Epidermis_Model.EpidermisCellGenome;
 import Epidermis_Model.Epidermis_Main;
 
 /**
@@ -58,6 +59,13 @@ public abstract class GenomeInfo <T extends GenomeInfo> {
         myTracker.AddMutant(this,nextGenome);
         return nextGenome;
     }
+
+    public T PerformCorrection(){
+        T nextGenome = (T) _RunPossibleCorrection();
+        //DisposeClone();
+        myTracker.AddMutant(this,nextGenome);
+        return nextGenome;
+    }
     public String FullLineageInfoStr(String delim){
         return myTracker.FullLineageInfoStr(id,delim);
     }
@@ -67,6 +75,8 @@ public abstract class GenomeInfo <T extends GenomeInfo> {
      * do not change the calling genome!!!!!!!!!!!!!!
      */
     public abstract T _RunPossibleMutation();
+
+    public abstract EpidermisCellGenome _RunPossibleCorrection();
 
     /**
      * returns a string with info about the genome to be stored
