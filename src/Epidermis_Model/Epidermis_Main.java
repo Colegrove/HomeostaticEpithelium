@@ -45,7 +45,7 @@ class EpidermisConst {
     static int microNeedles = 4; // Microneedle injection sites: square value for total number of needles
     static double margin_ratio = 0.1; // Margins around tissue where microneedles are not injected.
     static Integer needleSpacing = null; // A defined distance between adjacent microneedles in cellular distance (null for default spacing)
-    static double correctionEfficiency = 0.9; // The probability that a cell in range of an injection site is corrected.
+    static double correctionEfficiency = 0.9; //TODO The probability that a cell in range of an injection site is corrected.
 
     /**
      * Mutation Rate Set Options
