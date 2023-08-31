@@ -62,7 +62,7 @@ public abstract class GenomeInfo <T extends GenomeInfo> {
 
     public T PerformCorrection(){
         T nextGenome = (T) _RunPossibleCorrection();
-        //DisposeClone();
+        DisposeClone();
         myTracker.AddMutant(this,nextGenome);
         return nextGenome;
     }

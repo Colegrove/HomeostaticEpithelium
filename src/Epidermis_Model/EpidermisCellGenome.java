@@ -140,11 +140,11 @@ public class EpidermisCellGenome extends GenomeInfo<EpidermisCellGenome> {
     // Function to create a new genome with a specific color profile for corrected cells in the grid 28Aug23HLC
     @Override
     public EpidermisCellGenome _RunPossibleCorrection(){
-        String EmptyGenome = "";
+        String CorrectedGenome = "FAcorrection";
         if (h == 0f && s == 0f && v == 1f) {
-            return new EpidermisCellGenome(RN.nextFloat(), 1f, 0.75f, EmptyGenome, theGrid);
+            return new EpidermisCellGenome(RN.nextFloat(), 1f, 0.75f, CorrectedGenome, theGrid);
         } else {
-            return new EpidermisCellGenome(h, RN.nextFloat() * 0.3f + 0.6f, RN.nextFloat() * 0.55f + 0.3f, EmptyGenome, theGrid);
+            return new EpidermisCellGenome(h, RN.nextFloat() * 0.3f + 0.6f, RN.nextFloat() * 0.55f + 0.3f, CorrectedGenome, theGrid);
         }
         //return new EpidermisCellGenome(.4722f, 0.6f,.67f, EmptyGenome,theGrid); //green corrected color
         //return new EpidermisCellGenome(.861f, 0.6f,.67f, EmptyGenome,theGrid);

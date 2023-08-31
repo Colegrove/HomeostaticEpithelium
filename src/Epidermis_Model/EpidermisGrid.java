@@ -121,11 +121,9 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
                 CorrectionPoints.add(new int[]{pointx,0,pointz});
             }
         }
-        for(int i=0; i< CorrectionPoints.size(); i++){
-            System.out.print("Point i= " + i + " x = " + CorrectionPoints.get(i)[0] + " z= " + CorrectionPoints.get(i)[2] + "\n");
-        }
-//        for(int i=0; i < 5; i++){
-//            CorrectionPoints.add(new int[]{i,0,i});
+        // print coordinates of correction sites
+//        for(int i=0; i< CorrectionPoints.size(); i++){
+//            System.out.print("Point i= " + i + " x = " + CorrectionPoints.get(i)[0] + " z= " + CorrectionPoints.get(i)[2] + "\n");
 //        }
     }
 
@@ -133,13 +131,11 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
         for (int i = 0; i < CHEMICAL_STEPS; i++) {
             ChemicalLoop();
         }
-        System.out.print("before: " + corrected + "\n");
         for (EpidermisCell c: this) {
             c.CellStep();
             MeanProlif(c);
 //            MeanDeath();
         }
-        System.out.print("after: " + corrected + "\n");
         corrected = true; // after first step completed - corrected -> true allows for no further correction 29aug23HLC
         popSum+=GetPop();
         CleanShuffInc(RN); // Special Sauce

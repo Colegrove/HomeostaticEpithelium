@@ -133,6 +133,15 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
                     }
                 }
             }
+            if(CorrectedBlockChanges) { // if cell is corrected apply the blocking probability 31Aug23HLC
+                String cellToMoveGenome = c.myGenome.GenomeInfoStr();
+                if (cellToMoveGenome.contains("FAcorrection")) {
+                    System.out.print("block recognized\n");
+                    if (CorrectedBlockProbability > RN.nextDouble()) {
+                        return false;
+                    }
+                }
+            }
             int x = G().ItoX(i);
             int y = G().ItoY(i);
             int z = G().ItoZ(i);

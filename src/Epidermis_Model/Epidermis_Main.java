@@ -45,6 +45,8 @@ class EpidermisConst {
     static int microNeedles = 4; // Microneedle injection sites: square value for total number of needles
     static double margin_ratio = 0.1; // Margins around tissue where microneedles are not injected.
     static Integer needleSpacing = null; // A defined distance between adjacent microneedles in cellular distance (null for default spacing)
+    static double CorrectedBlockProbability = 0.3; // Corrected cell's blocking probability
+    static final boolean CorrectedBlockChanges = true; // Whether to run corrected cell's selective advantage
     static double correctionEfficiency = 0.9; //TODO The probability that a cell in range of an injection site is corrected.
 
     /**
@@ -226,7 +228,6 @@ public class Epidermis_Main {
             }
 
             // Main Running of the steps within the model
-
             Epidermis.RunStep();
 
             /*
