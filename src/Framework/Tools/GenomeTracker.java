@@ -178,6 +178,7 @@ public class GenomeTracker <T extends GenomeInfo> implements Iterable<T>{
         }
         while(clone !=null){
             ret[iClone*2]=clone.id;
+            System.out.print(clone.id);
             ret[iClone*2+1]=clone.pop;
             clone=(T)clone.next;
             iClone++;

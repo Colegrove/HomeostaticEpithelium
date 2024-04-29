@@ -12,10 +12,10 @@ import Framework.Tools.Utils;
 
 import static Epidermis_Model.EpidermisConst.*;
 
-import java.awt.*;
-import java.util.ArrayList;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.util.*;
 import java.util.List;
-import java.util.Random;
 
 /**
  * Created by schencro on 3/31/17.
@@ -26,6 +26,7 @@ import java.util.Random;
 class EpidermisGrid extends Grid3<EpidermisCell> {
     final Random RN=new Random(EpidermisConst.Replicate*EpidermisConst.RecordTime);
     static final int[] moveHood={1,0,0, -1,0,0, 0,0,1, 0,0,-1, 0,-1,0};
+    //static final int[] moveHood={1,0,0, -1,0,0, 0,0,1, 0,0,-1,0,1,0};
     static final int[] divHood={1,0,0, -1,0,0, 0,0,1, 0,0,-1, 0,1,0};
     static final int[] inBounds= new int[5];
     static final int MOVE=1;
@@ -37,7 +38,9 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
     static final int CHEMICAL_STEPS=100; // number of times diffusion is looped every tick
     public int[] divisions = new int[ModelTime*ySize];
     public int divs = 0;
-    static double[][][][] ImageArray = new double[EpidermisConst.ySize][EpidermisConst.xSize][EpidermisConst.zSize][4];
+    static double[][][][] ImageArray = new double[EpidermisConst.ySize][EpidermisConst.xSize][EpidermisConst.zSize][7];
+    //static int[][][] divArray = new int[EpidermisConst.xSize][EpidermisConst.zSize][ModelTime];
+
     boolean running;
     int xDim;
     int yDim;
@@ -51,7 +54,9 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
 
     static boolean corrected = true; // changes to false during correction timestep and changes back to true afterword
                                     // so no further correction occurs 29Aug23HLC
-    static List<int[]> CorrectionPoints = new ArrayList<>(); // create a list of coordinates for corrected cells 29Aug23HLC
+    static List<int[]> InjectionSites = new ArrayList<>(); // create a list of coordinates for center of injection site 29Aug23HLC
+    static List<double[]> CorrectionProbs = new ArrayList<>(); // create a list of coordinates containing correction probabilities 14Nov23HLC
+    static List<int[]> CorrectionPoints = new ArrayList<>(); // create a list of coordinates for cells to correct 14Nov23HLC
 
     public EpidermisGrid(int x, int y, int z) {
         super(x,y,z,EpidermisCell.class);
@@ -60,7 +65,7 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
         yDim = y;
         zDim = z;
         EGF = new GridDiff3(x, y, z);
-        GenomeStore = new GenomeTracker<>(new EpidermisCellGenome(0f,0f,1f,"", this), true, true);
+        GenomeStore = new GenomeTracker<>(new EpidermisCellGenome(0f,0f,1f,"", this, -1), true, true);
         Turnover = new LossReplace(this, ModelTime, 7);
         PlaceCells();
     }
@@ -71,19 +76,142 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
                 for (int z = 0; z < xDim; z++) {
                     if (GetAgent(x, y, z) == null) {
                         EpidermisCell c = NewAgentSQ(x, y, z);
-                        c.init(KERATINOCYTE, GenomeStore.NewProgenitor()); // Initializes cell types; Uniform Start
+                        c.init(KERATINOCYTE, GenomeStore.NewProgenitor(), tp53CloneTracker); // Initializes cell types; Uniform Start
                     }
                 }
             }
         }
     }
 
-    public void GenerateCorrectionPoints(){ // Adds as an int array coordinates of the desired correction locations. 30Aug23HLC
+    public void confluenceCheck(){
+        int basalCorrCount = 0;
+        for (int x = 0; x < EpidermisConst.xSize; x++) {
+            for (int z = 0; z < EpidermisConst.zSize; z++) {
+                EpidermisCell c = GetAgent(x, 0, z);
+                if(c !=null ){
+                    String genomeString = c.myGenome.FullLineageInfoStr("");
+                    if (genomeString.contains("FAcorrection")) {
+                        basalCorrCount++;
+                    }
+                }
+            }
+        }
+        if(stopAtConfluence) {
+            if (basalCorrCount >= xSize * xSize * 0.8) {
+                confluence = true;
+            }
+        }
+        if(stopAtLoss) {
+            if(stopLossTime == 0) {
+                if (basalCorrCount == 0 && GetTick() > correctionTime) {
+                    loss = true;
+                }
+            } else if (stopLossTime <= GetTick()/(364*4.5)){
+                if (basalCorrCount == 0 && GetTick() > correctionTime) {
+                    loss = true;
+                }
+            }
+        }
+    }
 
+    // For each microneedle injection site, determine which surrounding cells are corrected based on bivariate normal distribution
+    public void diffusionCorrectionPoints(){
+        // open correction probabilities file and add coordinates and probabilites to a list
+        try{
+            File myFile = new File(corrProbFile);
+            Scanner myReader = new Scanner(myFile);
+            while (myReader.hasNextLine()){
+                String data = myReader.nextLine();
+                String[] values = data.split(" ");
+                int pointx = Integer.parseInt(values[0]);
+                int pointz = Integer.parseInt(values[1]);
+                double corrProb = Double.parseDouble(values[2]);
+                CorrectionProbs.add(new double[]{pointx,0,pointz,corrProb}); // adjusted by 49
+            }
+        } catch (FileNotFoundException e){
+            System.out.print("Error: Correction probabilities file not found.");
+            e.printStackTrace();
+        }
+
+        // Draw an n number of cells with replacement to be corrected based on their probability of corrections.
+
+        // sort the correction Probabilites into ascending order
+        CorrectionProbs.sort(Comparator.comparingDouble(arr -> arr[3]));
+        // compute the cumulative probabilities
+        for (int i = 1; i < CorrectionProbs.size(); i++) {
+            double[] prob = CorrectionProbs.get(i);
+            double[] prob_minus = CorrectionProbs.get(i-1);
+            prob[3] += prob_minus[3];
+        }
+        // How many cells are to be corrected at each microneedle
+        int n = EpidermisConst.dose;
+
+        // Adjust generic coordinates based on each injection site
+        for (int[] site:InjectionSites) {
+
+            // Find the samples
+            int pointsCounter = 0;
+            while(pointsCounter < n){
+                double rUniform = RN.nextDouble(); // random uniform number 0-1
+                for(double[] prob: CorrectionProbs){
+                    if(rUniform <= prob[3]){
+                        int pointx = site[0] + ((int) prob[0]);
+                        int pointz = site[2] + ((int) prob[2]);
+
+                        // Ensure equal number of samples at each injection needle
+                        // check if sample falls out of range of grid, if so then sample another
+                        if(pointx > xSize || pointx < 0 || pointz > xSize || pointz < 0){
+                            break;
+                        }
+
+                        int[] pointArray = {pointx,0,pointz,site[3]};
+                        // Since we are sampling with replacement, we don't want to sample the same cell twice
+                        // check if this one already pulled, if so then sample another
+
+                        boolean alreadyExists = false;
+                        for(int[] existingPoint : CorrectionPoints){
+                            if(Arrays.equals(existingPoint, pointArray)){
+                                alreadyExists = true;
+                                break;
+                            }
+                        }
+                        if(alreadyExists){
+                            break;
+                        }
+
+                        CorrectionPoints.add(pointArray);
+                        pointsCounter++;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Iterate through all cells and see if they are corrected or not based on their correction probability.
+        // Adjust generic coordinates based on each injection site
+//        for (int[] site:InjectionSites) {
+//            for(double[] point:CorrectionProbs){
+//                if(RN.nextDouble() < point[3]){
+//                    int pointx = site[0] + ((int) point[0]);
+//                    int pointz = site[2] + ((int) point[2]);
+//                    CorrectionPoints.add(new int[]{pointx, 0, pointz,site[3]});
+//                }
+//
+//            }
+//        }
+    }
+
+    public void GenerateCorrectionPoints(){ // Adds as an int array coordinates of the desired correction locations. 30Aug23HLC
         int planeSize = xSize;
         int maxCoordinate = microNeedles-1;
         int margin = (int) (planeSize*margin_ratio);
         int distanceX, distanceZ;
+        if(microNeedles == 1){
+            int centerX = (planeSize-1)/2;
+            int centerZ = (planeSize-1)/2;
+            InjectionSites.add(new int[]{centerX,0,centerZ,0});
+            return;
+        }
         if(needleSpacing != null){ // set spacing if predefined.
             distanceX = needleSpacing;
             distanceZ = needleSpacing;
@@ -118,12 +246,13 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
             for (int j=0; j < microNeedles; j++){
                 int pointx = offsetX + i * distanceX;
                 int pointz = offsetZ + j * distanceZ;
-                CorrectionPoints.add(new int[]{pointx,0,pointz});
+                InjectionSites.add(new int[]{pointx,0,pointz,i*microNeedles+j});
             }
         }
+
         // print coordinates of correction sites
-//        for(int i=0; i< CorrectionPoints.size(); i++){
-//            System.out.print("Point i= " + i + " x = " + CorrectionPoints.get(i)[0] + " z= " + CorrectionPoints.get(i)[2] + "\n");
+//        for(int i=0; i< InjectionSites.size(); i++){
+//            System.out.print("Point i= " + i + " x = " + InjectionSites.get(i)[0] + " z= " + InjectionSites.get(i)[2] + "\n");
 //        }
     }
 
@@ -191,6 +320,7 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
             if(c.Action == DIVIDE){
                 MeanProlif[c.Isq()] += 1;
             }
+
     }
 
     public float GetMeanAge(EpidermisGrid Epidermis){
@@ -284,6 +414,7 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
         }
     }
 
+
     // commented out appears to not be used - 25AUG23 HLC
     // Utils.HSBtoRGB error wants 4 doubles, but input is 3 floats
     // Reworked code to allow proper input to HSBtoRGB function. 25AUG23HLC
@@ -292,23 +423,76 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
         for(int i=0; i < (EpidermisConst.ySize*EpidermisConst.xSize*EpidermisConst.zSize);i++){
             EpidermisCell c = GetAgent(i);
             if (c != null){
-                if(c.myGenome.h ==1.0){ // Note: Reference (non-mutant) cells returned (1,1,1,0.1) - 29Aug23HLC
+                if(c.myGenome.h ==1.0){ //?
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][0] = 1.0;
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][1] = 1.0;
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][2] = 1.0;
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][3] = 0.1;
+                    ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][4] = 0;
+                    ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][5] = -1;
+                    ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][6] = -1;
                 } else {
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][0] = Utils.GetHSBtoRGB(c.myGenome.h,c.myGenome.s,c.myGenome.v)[0];
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][1] = Utils.GetHSBtoRGB(c.myGenome.h,c.myGenome.s,c.myGenome.v)[1];
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][2] = Utils.GetHSBtoRGB(c.myGenome.h,c.myGenome.s,c.myGenome.v)[2];
                     ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][3] = 0.80;
+                    ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][5] = c.myGenome.injSite;
+                    ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][6] = c.tp53Clone;
+                    //String genomeString = c.myGenome.GenomeInfoStr();
+                    String genomeString = c.myGenome.FullLineageInfoStr("");
+//                    if(genomeString.length() >0){
+//                        System.out.print(genomeString + " : ");
+//                        System.out.print(lineageString + "\n");
+//                    }
+
+                    if(genomeString.contains("FAcorrection")){
+                        //System.out.print(mutString);
+                        //System.out.println(genomeString);
+                        ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][4] = 666; // arbitrary number (>71) to mark corrected clones 31OCT23HLC
+                        if (genomeString.contains(".68.")){
+                            ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][4] = 777; // arbitrary number (>71) to mark corrected + tp53 clones 08FEB24HLC
+                        }
+
+                    }
+                    else {
+                        String[] parts = c.myGenome.GenomeInfoStr().split("\\.");
+                        if (parts.length >= 3) {
+                            // Extract the numbers between the first two "."
+                            Double result = Double.parseDouble(parts[1]);
+                            ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][4] = result;
+                            if(genomeString.contains(".68.")){
+                                ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][4] = 68; // keep track of tp53 mutants 08Feb24HLC
+                            }
+                        }
+                        else{
+                            ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][4] = 0; // reference cells
+                        }
+                    }
+//                    if(ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][4] == 68){
+//                        if(ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][0] == 1.0 && ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][1] ==1.0){
+//                            if(c.Ysq() == 0) {
+//                                System.out.print("\n" + ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][0] + "\n");
+//                                System.out.print("\nWeird case - Timestep: " + GetTick() + " X:" + c.Xsq() + " Y: " + c.Ysq() + " Z: " + c.Zsq() + "\n");
+//                                System.out.print("GenomeInfo String: " + c.myGenome.GenomeInfoStr() + " Full Lineage String: " + genomeString + "\n");
+//                            }
+//                        }
+//                    }
                 }
-            } else { // note: null (dead) cells are returned as 0,0,0,0 - 29AUG23HLC
+            } else { // note: null (dead) cells are returned as 0,0,0,0,-1 - 29AUG23HLC
                 ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][0] = 0.0;
                 ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][1] = 0.0;
                 ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][2] = 0.0;
                 ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][3] = 0.0;
+                ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][4] = -1.0;
+                ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][5] = -1.0;
+                ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][6] = -1.0;
             }
+            if(ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][4] == 68 && c.Ysq() == 0){
+                if(ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][6] == -1) {
+                    System.out.print(">>>>>> tp53 mutant clone: " + ImageArray[ItoY(i)][ItoX(i)][ItoZ(i)][6] + ":\n");
+                    System.out.print(c.myGenome.FullLineageInfoStr("") + "\n");
+                }
+                }
         }
     }
 
@@ -427,4 +611,5 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
         }
         System.out.println(EGFCons.toString());
     }
+
 }

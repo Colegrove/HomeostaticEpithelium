@@ -26,6 +26,7 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
      * parameters that may be changed for cell behavior
      **/
     double prolif_scale_factor = 0.02870462; //Correction for appropriate proliferation rate (Default = 0.15-0.2 with KERATINO_APOPTOSIS_EGF=0.01)
+
     double KERATINO_EGF_CONSPUMPTION = -0.006954863; //consumption rate by keratinocytes
     double KERATINO_APOPTOSIS_EGF = 0.005939094; //level at which apoptosis occurs by chance (above this and no apoptosis)
     double DEATH_PROB = 0.0038163034; //Overall Death Probability
@@ -40,17 +41,21 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
     int OldLocation;
     int NewLocation;
 
+    int divisionDirection; // added to this level for corrected cells to access if needs to change during division. 16OCT23HLC
+    int tp53Clone; // keeps track of order that tp53 mutations arise. This allows tp53 clones to gain new mutations
+
     /**
      * Parameters for cell specific tracking and genome information
      **/
     // Clonal dynamic tracking
     EpidermisCellGenome myGenome; // Creating genome class within each cell
 
-    public void init(int cellType, EpidermisCellGenome myGenome) { //This initilizes an agent with whatever is inside of this function...
+    public void init(int cellType, EpidermisCellGenome myGenome, int tp53Clone) { //This initilizes an agent with whatever is inside of this function...
         this.myType = cellType;
         this.Action = STATIONARY;
         // Storing Genome Reference to Parent and Itself if mutation happened
         this.myGenome = myGenome;
+        this.tp53Clone = -1;
     }
 
     // Gets where a cell is dividing if it's a basal cell and is proliferating
@@ -82,31 +87,140 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
         int y = Ysq();
         int z = Zsq();
         int i = Isq();
-        int iDivLoc;
+        //int iDivLoc;
 
         // TODO Implement change to acquire inBounds for the cell.
 
+
+        EpidermisCell c = G().GetAgent(i); //03OCT23 HLC
+        String cellToGrowGenome = c.myGenome.FullLineageInfoStr(""); // 03OCT23HLC get full genome info
         // If EGF is low then next double is likely to be higher...Results in no proliferation
-        if (myType == KERATINOCYTE && G().RN.nextDouble() > G().EGF.GetCurr(x, y, z) * prolif_scale_factor) {
+        // 03OCT23HLC if a corrected cell and using corrected growth advantage, modify proliferation scaling factor
+
+
+        if (cellToGrowGenome.contains("FAcorrection") && CorrectedGrowthChanges){
+            if(cellToGrowGenome.contains(".68") && p53Growth){
+                if (myType == KERATINOCYTE && G().RN.nextDouble() > G().EGF.GetCurr(x, y, z) * (prolif_scale_factor * CorrectedGrowthIncrease * tp53GrowthIncrease)) {
+                    //System.out.println("FA + tp53");
+                    //System.out.print("dividing corrected cell\n");
+                    return false;
+                }
+            }
+            else if (myType == KERATINOCYTE && G().RN.nextDouble() > G().EGF.GetCurr(x, y, z) * (prolif_scale_factor * CorrectedGrowthIncrease)) {
+                //System.out.print("dividing corrected cell\n");
+                return false;
+            }
+        }
+        else if (cellToGrowGenome.contains(".68.") && p53Growth){
+            if (myType == KERATINOCYTE && G().RN.nextDouble() > G().EGF.GetCurr(x, y, z) * (prolif_scale_factor * tp53GrowthIncreaseFA)) {
+                //System.out.print("dividing corrected cell\n");
+                return false;
+            }
+        }
+        else if (myType == KERATINOCYTE && G().RN.nextDouble() > G().EGF.GetCurr(x, y, z) * prolif_scale_factor) {
+            //System.out.print("dividing non-corrected cell\n");
             return false;
         }
 
         GetCoords(G().divHood, G().DIV);
-        iDivLoc = ProlifLoc(); // Where the new cell is going to be (which index) if basal cell
+        divisionDirection = ProlifLoc(); // Where the new cell is going to be (which index) if basal cell
 
-        boolean Pushed = CellPush(iDivLoc);
+        boolean Pushed = CellPush();
 
-        if(Pushed!=false && y==0 && (iDivLoc==0 || iDivLoc==1 || iDivLoc==3 || iDivLoc==2)){
+        if(Pushed!=false && y==0 && (divisionDirection==0 || divisionDirection==1 || divisionDirection==3 || divisionDirection==2)){
             G().Turnover.RecordLossBasal(); // Record Cell Loss from Pushing
         }
         if(Pushed==false){
             return false; // Only false if NOTCH mutation
         }
 
-        EpidermisCell newCell = G().NewAgentI(G().inBounds[iDivLoc]);
 
-        newCell.init(myType, myGenome.NewChild().PossiblyMutate()); // initializes a new skin cell, pass the cellID for a new value each time.
-        myGenome = myGenome.PossiblyMutate(); // Check if this duaghter cell, i.e. the progenitor gets mutations during this proliferation step.
+        EpidermisCell newCell = G().NewAgentI(G().inBounds[divisionDirection]);
+
+        int currentTp53Clone = tp53Clone;
+        int currentInjSite = myGenome.injSite;
+
+
+        // do daughter cells acquire a mutation
+        // based on if cell is corrected or not, perform potential to mutate based on specific mutation rates
+        if(newCell.myGenome.injSite == 0){
+            newCell.init(myType, myGenome.NewChild().PossiblyMutate_corrected(), tp53Clone); // initializes a new skin cell, pass the cellID for a new value each time.
+        }else{
+            newCell.init(myType, myGenome.NewChild().PossiblyMutate(), tp53Clone); // initializes a new skin cell, pass the cellID for a new value each time.
+        }
+        if(myGenome.injSite == 0){
+            myGenome = myGenome.PossiblyMutate_corrected(); // Check if this corrected daughter cell, i.e. the progenitor gets mutations during this proliferation step.
+        }else{
+            myGenome = myGenome.PossiblyMutate(); // Check if this daughter cell, i.e. the progenitor gets mutations during this proliferation step.
+        }
+
+
+        // keep prior injection site info if cells gain new mutation
+        newCell.myGenome.injSite = currentInjSite;
+        myGenome.injSite = currentInjSite;
+
+
+        if(newCell.myGenome.FullLineageInfoStr("").contains(".68.")){
+                // check to see what time step the mutation occurs at
+                // if the mutation occurs at current timestep, then subtract clone count
+                boolean currentMutation = false;
+                //String[] elements = newCell.myGenome.PrivateGenome.split(",");
+                String[] elements = newCell.myGenome.FullLineageInfoStr("").split(",");
+                for (String element : elements) {
+                    if (element.contains(".68.")) {
+                        String[] parts = element.split("\\.");
+                        if (parts.length >= 2) {
+                            String startingNumber = parts[0];
+                            int startingNumberInt = Integer.parseInt(startingNumber);
+                            if(startingNumberInt == G().GetTick()){
+                                currentMutation = true;
+                            }}
+                    }
+                }
+
+                if(newCell.Ysq() > 0 && currentMutation){
+                    tp53CloneTracker -= 1;
+                } else if(newCell.Ysq() == 0 && currentMutation) { // basal layer cell
+                    newCell.tp53Clone = tp53CloneTracker;
+                } else if(newCell.Ysq() == 0){ // new cell but no new mutations
+                    newCell.tp53Clone = this.tp53Clone;
+                }
+        }
+
+        if(myGenome.FullLineageInfoStr("").contains(".68.")){
+            boolean currentMutation = false;
+            boolean currentNontp53Mutation = false;
+            // If the tp53 mutation is not in the basal layer
+            // check to see what time step the mutation occurs at
+            // if the mutation occurs at current timestep, then subtract clone count
+            String[] elements = myGenome.FullLineageInfoStr("").split(",");
+            for (String element : elements) {
+                if (element.contains(".68.")) {
+                    String[] parts = element.split("\\.");
+                    if (parts.length >= 2) {
+                        String startingNumber = parts[0];
+                        int startingNumberInt = Integer.parseInt(startingNumber);
+                        if (startingNumberInt == G().GetTick()) {
+                            currentMutation = true;
+                        }
+                    }
+                } else {
+                    String[] parts = element.split("\\.");
+                    if (parts.length >= 2) {
+                        String startingNumber = parts[0];
+                        int startingNumberInt = Integer.parseInt(startingNumber);
+                        if (startingNumberInt == G().GetTick()) {
+                            currentNontp53Mutation = true;
+                        }
+                    }}}
+            if(Ysq() > 0 && currentMutation){
+                tp53CloneTracker -= 1;
+            } else if(Ysq() == 0 && currentMutation){
+                tp53Clone = tp53CloneTracker;
+            } else if(Ysq() == 0 && currentNontp53Mutation){
+                this.tp53Clone = currentTp53Clone;
+            }
+        }
 
         if(newCell.Ysq()==0){
             G().Turnover.RecordDivideBasal();
@@ -118,11 +232,15 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
         G().divisions[G().GetTick()*ySize+Ysq()]++;
         G().divs++;
 
+        // if tracking divisions, add division event to an array
+//        if(divRate){
+//            EpidermisGrid.divArray[c.Xsq()][c.Zsq()][G().GetTick()] = 1;
+//        }
         return true;
     }
 
-    public boolean CellPush(int iDivLoc){
-        int i = G().inBounds[iDivLoc];
+    public boolean CellPush(){
+        int i = G().inBounds[divisionDirection];
         EpidermisCell c=G().GetAgent(i);
         if(c!=null){
             if(EpidermisConst.NOTCH1FitnessChanges) {
@@ -133,13 +251,67 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
                     }
                 }
             }
-            if(CorrectedBlockChanges) { // if cell is corrected apply the blocking probability 31Aug23HLC
-                String cellToMoveGenome = c.myGenome.GenomeInfoStr();
-                if (cellToMoveGenome.contains("FAcorrection")) {
-                    System.out.print("block recognized\n");
-                    if (CorrectedBlockProbability > RN.nextDouble()) {
-                        return false;
-                    }
+
+            if(CorrectedBlockChanges || p53Blocking) { // if cell is corrected apply the blocking probability 31Aug23HLC
+                //String cellToMoveGenome = c.myGenome.GenomeInfoStr();
+                String cellToMoveGenome = c.myGenome.FullLineageInfoStr("");
+                int blockSwitch = 0;
+                if(cellToMoveGenome.contains("FAcorrection") && cellToMoveGenome.contains(".68.")){
+                    blockSwitch = 1; // correction + tp53
+                }
+                else if(cellToMoveGenome.contains(".68.")){
+                    blockSwitch = 2; // tp53 only
+                }
+                else if(cellToMoveGenome.contains("FAcorrection")){
+                    blockSwitch = 3; // correction only
+                }
+                switch(blockSwitch){
+                    case 1: // correction + tp53
+                        if (CorrectedBlockProbability + tp53BlockProb > RN.nextDouble()) {
+                            // if cell is blocked via blocking probability, change direction to divide up.
+                            if (allowVerticalDivision) {
+                                divisionDirection = 4;
+                                i = G().inBounds[divisionDirection];
+                                c = G().GetAgent(i);
+                                if (c == null) {
+                                    return false;
+                                }
+                            } else {
+                                return false;
+                            }
+                        }
+                        break;
+                    case 2: // tp53 only
+                        if (tp53BlockProb > RN.nextDouble()) {
+                            // if cell is blocked via blocking probability, change direction to divide up.
+                            if(allowVerticalDivision){
+                                divisionDirection = 4;
+                                i = G().inBounds[divisionDirection];
+                                c=G().GetAgent(i);
+                                if(c==null){
+                                    return false;
+                                }
+                            }else{
+                                return false;
+                            }
+
+                        }
+                        break;
+                    case 3: // corrected only
+                        if (CorrectedBlockProbability > RN.nextDouble()) {
+                            // if cell is blocked via blocking probability, change direction to divide up.
+                            if(allowVerticalDivision){
+                                divisionDirection = 4;
+                                i = G().inBounds[divisionDirection];
+                                c=G().GetAgent(i);
+                                if(c==null){
+                                    return false;
+                                }
+                            }else{
+                                return false;
+                            }
+                        }
+                        break;
                 }
             }
             int x = G().ItoX(i);
@@ -192,10 +364,11 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
     public void itDead(){
         myGenome.DisposeClone(); // Decrements Population
         Dispose();
-
+        //tp53Clone = -1;
         G().MeanDeath[Isq()] += 1;
 
         if(Ysq()==0){
+            //System.out.print("\n>>> >>>> >>> >> Basal cell death");
             G().Turnover.RecordLossBasal();
         }
         G().Turnover.RecordLossTissue();
@@ -215,7 +388,10 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
         }
         if (G().EGF.GetCurr(x, y, z) < KERATINO_APOPTOSIS_EGF && G().RN.nextDouble() < (Math.pow(1.0 - G().EGF.GetCurr(x, y, z) / KERATINO_APOPTOSIS_EGF, 5))) {
             //DEATH FROM LACK OF NUTRIENTS KERATINOCYTE
-            itDead();
+
+            if (y != 0) {
+                itDead();
+            }
             return;
         }
 
@@ -229,14 +405,19 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
             } else {
                 if(RN.nextDouble() < (DEATH_PROB)) {
                     //Random Fucked
-                    itDead();
+                    if(y !=0) {
+                        itDead();
+                    }
                     return;
                 }
             }
         } else {
             if(RN.nextDouble() < DEATH_PROB){
-                //Random Fucked
-                itDead();
+                //Random Apoptosis
+
+                if(y != 0) {
+                    itDead();
+                }
                 return;
             }
         }
@@ -247,6 +428,9 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
                 dipshit[ DirectionTracker(G().inBounds[iMoveCoord]) ] ++;
                 MoveI(G().inBounds[iMoveCoord]); // We are moving
                 Action = MOVING;
+                if(Ysq() == 0 && y !=0){
+                    System.out.print("CELL MOVED DOWN FROM POSITION - Y: " + y + "to Y: " + Ysq() + "\n");
+                }
                 if (Ysq() != 0 && y == 0) {
                     if (Ysq() > y) {
                         throw new RuntimeException("Cell is Moving Up.");
@@ -285,12 +469,13 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
             if(coords[0] != this.Xsq() || coords[1] != this.Ysq() || coords[2] != this.Zsq()){
                 continue;
             }
+
             else {
                 itDead(); // kill and remove the current cell
                 EpidermisCell newCell = G().NewAgentPT(coords[0],coords[1],coords[2]); // adds a new cell
-                newCell.init(myType, myGenome.NewChild().PerformCorrection()); // initializes a new skin cell
+                newCell.init(myType, myGenome.NewChild().PerformCorrection(coords[3]), tp53Clone); // initializes a new skin cell
                 //myGenome = myGenome.PerformCorrection(); // Appears to be redunant from line above: cells still become corrected
-                                                        // keeping line in case this may be for genome tracking purposes
+
             }
         }
     }

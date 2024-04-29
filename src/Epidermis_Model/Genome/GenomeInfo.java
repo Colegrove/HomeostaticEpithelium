@@ -51,7 +51,19 @@ public abstract class GenomeInfo <T extends GenomeInfo> {
      * returns a GenomeInfo instance that is either identical to the original or a mutant
      */
     public T PossiblyMutate(){
-        T nextGenome= _RunPossibleMutation();
+        T nextGenome= (T) _RunPossibleMutation();
+        if(nextGenome==null){
+            return (T)this;
+        }
+        DisposeClone();
+        myTracker.AddMutant(this,nextGenome);
+        return nextGenome;
+    }
+    /**
+     * returns a GenomeInfo instance that is either identical to the original or a mutant
+     */
+    public T PossiblyMutate_corrected(){
+        T nextGenome= (T) _RunPossibleMutation_corrected();
         if(nextGenome==null){
             return (T)this;
         }
@@ -60,8 +72,8 @@ public abstract class GenomeInfo <T extends GenomeInfo> {
         return nextGenome;
     }
 
-    public T PerformCorrection(){
-        T nextGenome = (T) _RunPossibleCorrection();
+    public T PerformCorrection(int injID){
+        T nextGenome = (T) _RunPossibleCorrection(injID);
         DisposeClone();
         myTracker.AddMutant(this,nextGenome);
         return nextGenome;
@@ -74,9 +86,17 @@ public abstract class GenomeInfo <T extends GenomeInfo> {
      * a potential mutation event, return null if the genome did not change, otherwise return a new genome with the change inside
      * do not change the calling genome!!!!!!!!!!!!!!
      */
-    public abstract T _RunPossibleMutation();
+    //public abstract T _RunPossibleMutation();
 
-    public abstract EpidermisCellGenome _RunPossibleCorrection();
+    //public abstract EpidermisCellGenome _RunPossibleCorrection();
+
+    //
+    public abstract EpidermisCellGenome _RunPossibleMutation();
+
+    public abstract EpidermisCellGenome _RunPossibleMutation_corrected();
+
+    // Function to create a new genome with a specific color profile for corrected cells in the grid 28Aug23HLC
+    public abstract EpidermisCellGenome _RunPossibleCorrection(int siteID);
 
     /**
      * returns a string with info about the genome to be stored

@@ -1,5 +1,6 @@
 package Epidermis_Model.Genome;
 
+import Epidermis_Model.Epidermis_Main;
 import Framework.Tools.FileIO;
 
 import java.util.ArrayList;
@@ -106,7 +107,7 @@ public class GenomeTracker <T extends GenomeInfo>{
      * records the sizes of all clonal populations that are alive when the function is called
      */
     public void RecordClonePops(){
-        int[]ret=new int[nActiveClones*2];
+        int[]ret=new int[nActiveClones*2+100];
         int iClone=0;
 //        if(progenitors.popSize!=0){
 //            ret[0]=progenitors.id;

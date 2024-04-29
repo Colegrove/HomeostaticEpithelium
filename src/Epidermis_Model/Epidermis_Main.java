@@ -10,6 +10,8 @@ import java.awt.*;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 
+import static Epidermis_Model.EpidermisConst.*;
+
 
 /**
  * Created by schencro on 3/24/17.
@@ -17,7 +19,10 @@ import java.util.ArrayList;
 
 //Holds Constants for rest of model
 class EpidermisConst {
-    static int xSize = 20; // keratinocyte modal cell size = 15µm (Proc. Natl. Acad. Sci. USA Vol.82,pp.5390-5394,August1985; YANN BARRANDON and HOWARD GREEN) == volume == 1766.25µm^3
+    static int xSize = 20; // CHANGE
+
+    //static int xSize = 100; // keratinocyte modal cell size = 15µm (Proc. Natl. Acad. Sci. USA Vol.82,pp.5390-5394,August1985; YANN BARRANDON and HOWARD GREEN) == volume == 1766.25µm^3
+
     // (Sampled area = 1mm-2mm^2); Sampled volume = 4.4*10^8µm^3; Total cells needed for 2mm^2 area with depth of 140µm= 249115cells (xSize = 12456, ySize = 20);
     // For 1mm^2 area with depth of 140µm = 62279cells (xSize = 3114, ySize = 20);
     // Takes forever to reach even a year. Cutting the smallest biopsy into a quarter (1/4) = 15570cells (xSize = 1038, ySize = 20)
@@ -30,29 +35,64 @@ class EpidermisConst {
     static final int STATIONARY = 3; // Attribute if cell is stationary
     static final int MOVING = 4; //Attribute if cell is moving
 
-    static int years = 1; // time in years.
+    static int years = 50; // time in years.
     //static int RecordTime = years * 365;
-    static int RecordTime = 2;
-    static int[] RecordTimeArray = {2,10,100,365};
+    static int RecordTime = 365;
+
+    //static int[] RecordTimeArray = new int[120];
+    static int[] RecordTimeArray = new int[1001];
+
+//    static int[] RecordTimeArray = {
+//            2, 365, 730, 1095, 1460, 1825, 2190, 2555, 2920, 3285, 3650, 4015, 4380, 4745,
+//            5110, 5475, 5840, 6205, 6570, 6935, 7300
+//    };
+
+    // record time scaled by 7 timesteps per day and by 4.5 timesteps per day
+    // record 2 days, 3 weeks, 6 weeks, and 12 weeks
+//    static int[] RecordTimeArray = {
+//            2, 95, 189, 378, 147, 294, 588
+//
+//    };
     static int ModelTime = years * 365 + 10; // Time in days + 10 days after time for recording! e.v. 65 years = 23725
-    //static int ModelTime = 365;
+    //static int ModelTime = 50; // Time in days + 10 days after time for recording! e.v. 65 years = 23725
+
+
     static final int VisUpdate = 7; // Timestep interval to update Division and Death, etc.
     static int Replicate = 1; // Replicate number to be multiplied by the RecordTime to set the seed
 
     /**
      * Correction parameters 30Aug23HLC
      */
-    static int microNeedles = 4; // Microneedle injection sites: square value for total number of needles
-    static double margin_ratio = 0.1; // Margins around tissue where microneedles are not injected.
-    static Integer needleSpacing = null; // A defined distance between adjacent microneedles in cellular distance (null for default spacing)
-    static double CorrectedBlockProbability = 0.3; // Corrected cell's blocking probability
-    static final boolean CorrectedBlockChanges = true; // Whether to run corrected cell's selective advantage
-    static double correctionEfficiency = 0.9; //TODO The probability that a cell in range of an injection site is corrected.
+
+    static boolean stopAtConfluence = false; // determines if the model should stop running if confluence is reached.
+    static boolean stopAtLoss = false; // determines if the model should stop running if corrected cells are lost.
+    static int stopLossTime = 0; // 0 will stop at any time of loss, 1 will only stop simulations lost within 1 year.
+    static boolean confluence = false; // if model reaches confluence, boolean changes true. 14Nov23HLC
+    static boolean loss = false; // if model loses all corrected cells, boolean changes true. 14Nov23HLC
+    static int correctionTime = 10; // Timestep of correction (days)
+    static int microNeedles = 1; // Microneedle injection sites: square value for total number of needles
+    static double margin_ratio = 0.1; // Margins on edge of tissue where microneedles are not injected.
+    static Integer needleSpacing = 50; // A defined distance between adjacent microneedles in cellular distance (null for default spacing)
+    static boolean CorrectedBlockChanges = true; // Whether to run corrected cell's selective advantage
+    static boolean allowVerticalDivision = true; // If blocking probability prevents division, then divide up.
+    static double CorrectedBlockProbability = 1.0; // Corrected cell's blocking probability
+    static boolean CorrectedGrowthChanges = false; // Whether to run corrected cell's selective advantage
+    static double CorrectedGrowthIncrease = 1.0; // Acts on proliferation scale factor. e.g. value of 1.1 provides a 10% increase to proliferation scale factor
+    //static double tp53BlockProb = 0.41; // Gives tp53 a blocking probability advantage compared to background FA
+    static double tp53BlockProb = 0.005; // Gives tp53 a blocking probability advantage compared to background FA
+    static int transGeneDiffusion = 2; // Diagonals of bivariate normal distribution covariance matrix acting on the diffusion of transgene.
+    static int dose = 30; // How many cells to be corrected at each microneedle
+    //static String corrProbFile = "/Volumes/gs-vol1/home/huntc10/proj/HomeostaticEpithelium/corrProbs/corrProbs_sigma_" + transGeneDiffusion + ".txt";
+    static String corrProbFile = "/net/gs/vol1/home/huntc10/proj/HomeostaticEpithelium/corrProbs/corrProbs_sigma_" + transGeneDiffusion + ".txt";
+    static boolean divRate = false; // if true output all division information into a file.
+    static int timepoint_collection = 0; // 0 for every six months, 1 for every year, 2 for every timestep (1000), 3 for martincorena timepoints
 
     /**
      * Mutation Rate Set Options
      */
-    static int MutRateSet = 0; // Select which mutation rate is required. /TODO Doesn't work, always what the genome is set to.
+    static int MutRateSet = 5; // Select which mutation rate is required.
+    static int mutRateAdjustment = 1; // reduces the mutation rate by a factor of
+    static int corrMutRate = 2; // Corrected cells reduce mutation rate by factor of
 
     /**
      * TP53 Fitness Change Options
@@ -63,6 +103,11 @@ class EpidermisConst {
     static final boolean PrintPopsForODE = false;
     static final boolean PrintSunDays = false;
 
+    static double tp53GrowthIncreaseFA = 1.1; // Acts on proliferation scale factor on FA background. e.g. value of 1.1 provides a 10% increase to proliferation scale factor
+    static double tp53GrowthIncrease = 1.01; // Acts on proliferation scale factor on normal (FA corrected) background.
+    static int tp53CloneTracker = -1; // counts tp53 clones
+
+
     /**
      * NOTCH Fitness Change Options
      */
@@ -71,8 +116,8 @@ class EpidermisConst {
     /**
      * Booleans for Run Options
      */
-    static final boolean GuiOn = true; // use for visualization, set to false for jar file / multiple runs
-    static final boolean JarFile = false; // Set to true if running from command line as jar file!!!!!!!!
+    static final boolean GuiOn = false; // use for visualization, set to false for jar file / multiple runs
+    static final boolean JarFile = true; // Set to true if running from command line as jar file!!!!!!!!
     static final boolean RecordParents = true; // use when you want parents information
     static final boolean RecordLineages = true; // use when you want
     static final boolean RecordPopSizes = true; // Use to record clone population sizes
@@ -85,7 +130,9 @@ class EpidermisConst {
     static final boolean Wounding = false; // Use to do wounding
     static final boolean PFiftyThree = false; // Whether to perform P53 Fitness testing through turnind Random Death Prob off.
     static final boolean PFiftyThreeSunDays = false; // Whether to include a sun days UV damage rate.
-    static final boolean NOTCH1FitnessChanges = true; // Whether to run NOTCH1 Fitness Changes.
+    static final boolean p53Growth = false; // 27Oct23 HLC gives p53 mutations a growth rate advantage.
+    static final boolean p53Blocking = true;
+    static final boolean NOTCH1FitnessChanges = false; // Whether to run NOTCH1 Fitness Changes.
 
 }
 
@@ -128,7 +175,10 @@ public class Epidermis_Main {
         String MutationFile = System.getProperty("user.dir") + "/TestOutput/MutationFile.csv";
         String r_lambda_file = System.getProperty("user.dir") + "/TestOutput/R_Lambda_Values.csv";
         String PositionFile = System.getProperty("user.dir") + "/TestOutput/PositionList.csv";
-        String Image_file = System.getProperty("user.dir") + "/TestOutput/VisFile.txt";
+        String Image_file = System.getProperty("user.dir") + "/TestOutput/VisFiles/VisFile.txt";
+        String divisionsFile = System.getProperty("user.dir") + "/TestOutput/divFile.txt";
+
+
         /*
         Sets up Data Files if on cluster or if ran locally
          */
@@ -137,27 +187,89 @@ public class Epidermis_Main {
             PopSizes = args[1];
             MutationFile = args[2];
             r_lambda_file = args[3];
-            EpidermisConst.xSize = Integer.parseInt(args[4]);
-            EpidermisConst.zSize = Integer.parseInt(args[4]);
-            int Time = Integer.parseInt(args[5]);
+            Image_file = args[4]; // 12SEP23HLC
+            EpidermisConst.xSize = Integer.parseInt(args[5]);
+            EpidermisConst.zSize = Integer.parseInt(args[5]);
+            int Time = Integer.parseInt(args[6]);
             EpidermisConst.years = Time;
-            EpidermisConst.ModelTime = Time * 365 + 10;
-            EpidermisConst.RecordTime = Time * 365;
-            EpidermisConst.MutRateSet = Integer.parseInt(args[6]);
-            EpidermisCellGenome.MutRateSet = EpidermisConst.MutRateSet;
-            EpidermisConst.SunDaysFreqency = Integer.parseInt(args[7]);
-            EpidermisConst.SunDaysDeathProb = Double.parseDouble(args[8]);
-            EpidermisConst.Replicate = Integer.parseInt(args[9]);
-            EpidermisConst.NOTCHBlockProbability = Double.parseDouble(args[10]);
+            EpidermisConst.ModelTime = (int) (Time * 364 * 4.5);
+            //EpidermisConst.ModelTime = 590;
+            EpidermisConst.RecordTime = Time * 364;
+            EpidermisConst.MutRateSet = Integer.parseInt(args[7]);
+            //EpidermisCellGenome.MutRateSet = EpidermisConst.MutRateSet;
+            //EpidermisConst.SunDaysFreqency = Integer.parseInt(args[7]);
+            //EpidermisConst.SunDaysDeathProb = Double.parseDouble(args[8]);
+            //EpidermisConst.Replicate = Integer.parseInt(args[9]);
+            //EpidermisConst.NOTCHBlockProbability = Double.parseDouble(args[10]);
+            EpidermisConst.microNeedles = Integer.parseInt(args[8]); // 12SEP23HLC
+            EpidermisConst.needleSpacing = Integer.parseInt(args[9]); // 12SEP23HLC
+            EpidermisConst.CorrectedBlockProbability = Double.parseDouble(args[10]); // 12SEP23HLC
+            EpidermisConst.CorrectedGrowthIncrease = Double.parseDouble(args[11]); // 03OCT23HLC
+            EpidermisConst.CorrectedBlockChanges = Boolean.parseBoolean(args[12]); //16OCT23HLC
+            EpidermisConst.allowVerticalDivision = Boolean.parseBoolean(args[13]); // 16OCT23HLC
+            EpidermisConst.CorrectedGrowthChanges = Boolean.parseBoolean(args[14]); //16OCT23HLC
+            EpidermisConst.correctionTime = Integer.parseInt(args[15]); // 27OCT23 HLC
+            EpidermisConst.tp53GrowthIncreaseFA = Double.parseDouble(args[16]); // 30Oct23HLC
+            EpidermisConst.tp53GrowthIncrease = Double.parseDouble(args[17]); // 06NOV23HLC
+            EpidermisConst.tp53BlockProb = Double.parseDouble(args[18]);
+            EpidermisConst.transGeneDiffusion = Integer.parseInt(args[19]); // 13NOV23HLC
+            corrProbFile = "/net/gs/vol1/home/huntc10/proj/HomeostaticEpithelium/corrProbs/corrProbs_sigma_" + transGeneDiffusion + ".txt";
+            EpidermisConst.dose = Integer.parseInt(args[20]); // 13NOV23HLC
+            stopAtConfluence = Boolean.parseBoolean(args[21]); // 10JAN24HLC
+            stopAtLoss = Boolean.parseBoolean(args[22]); //10JAN24HLC
+            EpidermisConst.mutRateAdjustment = Integer.parseInt(args[23]);
+            EpidermisCellGenome.mutRateAdjustment = EpidermisConst.mutRateAdjustment;
+            timepoint_collection = Integer.parseInt(args[24]);
+            stopLossTime = Integer.parseInt(args[25]);
+            EpidermisConst.corrMutRate = Integer.parseInt(args[26]);
+            EpidermisCellGenome.corrMutRate = EpidermisConst.corrMutRate;
+
 //            PositionFile = args[7];
         } else {
             EpidermisCellGenome.MutRateSet = EpidermisConst.MutRateSet;
         }
+        // update mutation rates if needed
+        EpidermisCellGenome.PoissonDists_corr = EpidermisCellGenome.BuildPoissons_corr(corrMutRate);
+        EpidermisCellGenome.PoissonDists = EpidermisCellGenome.BuildPoissons(mutRateAdjustment);
 
         if(EpidermisConst.GuiOn == false && EpidermisConst.GetImageData == false){
             System.out.println("xSize and zSize: " + EpidermisConst.xSize);
             System.out.println("Years: " + EpidermisConst.years);
         }
+
+        // Record Time array to record every 6 months with 4.5 timestep scaling.
+        if(timepoint_collection == 0){
+            double rawValue = 182*4.5;
+            // every 6 months
+            EpidermisConst.RecordTimeArray[0] = 2;
+            for(int i=1; i<=EpidermisConst.years*2; i++){
+                EpidermisConst.RecordTimeArray[i] = (int) rawValue*i;
+            }
+        } else if (timepoint_collection == 1) {
+             //every year
+            double rawValue = 364*4.5;
+            EpidermisConst.RecordTimeArray[0] = 2;
+            for(int i=1; i<=EpidermisConst.years; i++){
+                EpidermisConst.RecordTimeArray[i] = (int) rawValue*i;
+            }
+        } else if (timepoint_collection == 2){
+            // every timestep 1000 frames
+            for(int i=1; i<=1000; i++){
+                EpidermisConst.RecordTimeArray[i] = i;
+            }
+        } else if (timepoint_collection == 3){
+            // martincorena timepoints only
+            EpidermisConst.RecordTimeArray[0] = 35217;
+            EpidermisConst.RecordTimeArray[1] = 41769;
+            EpidermisConst.RecordTimeArray[2] = 61425;
+            EpidermisConst.RecordTimeArray[3] = 74529;
+            EpidermisConst.RecordTimeArray[4] = 81081;
+            EpidermisConst.RecordTimeArray[5] = 87633;
+        }
+
+
+
+
 
         final EpidermisGrid Epidermis = new EpidermisGrid(EpidermisConst.xSize, EpidermisConst.ySize, EpidermisConst.zSize); // Initializes and sets up the program for running
         Runtime rt = Runtime.getRuntime();
@@ -216,14 +328,18 @@ public class Epidermis_Main {
         int SunDayCounter=0;
         int[] SunTimes=new int[EpidermisConst.SunDays];
 
-        Epidermis.GenerateCorrectionPoints(); // method to generate a list of coordinates for correction 29aug23HLC
+        // method to generate a list of coordinates for correction based on microneedles and spacing 29aug23HLC
+        Epidermis.GenerateCorrectionPoints();
+        // method to generate a list of cells to be corrected after transgene diffusion from above needle injection sites 14Nov23HLC
+        Epidermis.diffusionCorrectionPoints();
 
         TickRateTimer tickIt = new TickRateTimer();
         while(Epidermis.GetTick() < EpidermisConst.ModelTime){
+            //System.out.print("Model is starting timestep: " + Epidermis.GetTick() + "\n");
 
 //            tickIt.TickPause(60); // Adjusting a frame rate
 
-            if(Epidermis.GetTick() == 1){ // correction timestep - triggers boolean for correction 29aug23HLC
+            if(Epidermis.GetTick() == EpidermisConst.correctionTime){ // correction timestep - triggers boolean for correction 29aug23HLC
                 EpidermisGrid.corrected = false;
             }
 
@@ -295,10 +411,13 @@ public class Epidermis_Main {
             if(BottomVisMove!=null){Epidermis.DrawCellPopsBottomActivity(BottomVisMove, Epidermis, CellDraw);}
             if(EGFVis!=null){Epidermis.DrawChemicals(EGFVis, true, false);} // 3D Good
 
+            // check if corrected cells have reached confluence (or loss) of the basal layer. 14Nov23HLC
+            Epidermis.confluenceCheck();
+
             for (int i=0; i< EpidermisConst.RecordTimeArray.length; i++) {
                 int Time = EpidermisConst.RecordTimeArray[i];
                 // Use this to get the information for 3D visualizations for OpenGL
-                if (EpidermisConst.GetImageData && Epidermis.GetTick() == Time) {
+                if (EpidermisConst.GetImageData && (Epidermis.GetTick() == Time || EpidermisConst.confluence || EpidermisConst.loss)) {
                     Epidermis.BuildMathematicaArray();
                     FileIO VisOut = new FileIO(Image_file + "." + Epidermis.GetTick() + ".txt", "w");
                     for (int x = 0; x < EpidermisConst.xSize; x++) {
@@ -308,18 +427,33 @@ public class Epidermis_Main {
                                 String outLine =
                                         x + "\t" + z + "\t" + y + "\t" +
                                                 Epidermis.ImageArray[y][x][z][0] + "\t" + Epidermis.ImageArray[y][x][z][1] +
-                                                "\t" + Epidermis.ImageArray[y][x][z][2] + "\t" + Epidermis.ImageArray[y][x][z][3] + "\n";
-                                System.out.print(outLine);
+                                                "\t" + Epidermis.ImageArray[y][x][z][2] + "\t" + Epidermis.ImageArray[y][x][z][3] +
+                                                "\t" + Epidermis.ImageArray[y][x][z][4] + "\t" + Epidermis.ImageArray[y][x][z][5] +
+                                                "\t" + Epidermis.ImageArray[y][x][z][6] + "\n";
                                 VisOut.Write(outLine);
+//                                if(Epidermis.ImageArray[y][x][z][4] == 68){
+//                                    System.out.print(">>>>>> tp53 mutant clone: " + Epidermis.ImageArray[y][x][z][6] + "\n");
+//                                    System.out.print()
+//                                }
                             }
                             //}
                         }
                     }
-
+                    if(EpidermisConst.confluence){
+                        VisOut.Write("Confluence");
+                    }
+                    if(EpidermisConst.loss){
+                        VisOut.Write("Loss");
+                    }
                     VisOut.Close();
-                    System.out.println("Done");
+                    System.out.println("Vis timepoint saved. Year: " + Epidermis.GetTick()/4.5/364);
+                }
+                if(EpidermisConst.confluence || EpidermisConst.loss){
+                    break;
                 }
             }
+
+
 //            if(EpidermisConst.GetImageData==true && (Epidermis.GetTick() / 365f == 25 || Epidermis.GetTick() / 365f == 50 || Epidermis.GetTick() / 365f == 75)){
 //                System.out.println(new DecimalFormat("#.0").format((Epidermis.GetTick() / 365f)));
 //                Epidermis.rglVisualization();
@@ -381,7 +515,7 @@ public class Epidermis_Main {
                 }
             }
 
-            if(EpidermisConst.RecordAllPopSizes && EpidermisConst.RecordTime != Epidermis.GetTick() && (Epidermis.GetTick()%10.)==0){
+            if(EpidermisConst.RecordAllPopSizes && EpidermisConst.RecordTime != Epidermis.GetTick() && (Epidermis.GetTick()%1.)==0){ //Updated to take every timepoint 20Sep23HLC
                 Epidermis.GenomeStore.RecordClonePops();
             }
 
@@ -434,8 +568,31 @@ public class Epidermis_Main {
                     System.out.println("Position Information Saved to File");
                 }
             }
-
+            // end simulation if corrected cells have reached confluence or loss 14NOV23HLC
+            if(EpidermisConst.confluence){
+                System.out.print("Corrected cells reached basal layer confluence at day: " + Epidermis.GetTick());
+                break;
+            }
+            if(EpidermisConst.loss){
+                System.out.print("Corrected cells lost from basal layer at day: " + Epidermis.GetTick());
+                break;
+            }
         }
+//        if(EpidermisConst.divRate){
+//            FileIO divOut = new FileIO(divisionsFile, "w");
+//            for (int x = 0; x < EpidermisConst.xSize; x++) {
+//                for (int z = 0; z < EpidermisConst.zSize; z++) {
+//                    for(int t=0; t < EpidermisConst.ModelTime; t++){
+//                        String outLine = x + "\t" + z + "\t" + t + "\t" + EpidermisGrid.divArray[x][z][t] + "\n";
+//                        divOut.Write(outLine);
+//                    }
+//                }
+//            }
+//            divOut.Close();
+//        }
+
+
+
 
 //        System.out.println(java.util.Arrays.toString(EpidermisCell.dipshit));
 //        System.out.println(java.util.Arrays.toString(EpidermisCell.dipshitDiv));
