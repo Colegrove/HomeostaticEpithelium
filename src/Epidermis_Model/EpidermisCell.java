@@ -134,6 +134,8 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
             return false; // Only false if NOTCH mutation
         }
 
+        //cell division
+        //System.out.print("dividing cell - x position = " + x + " y position = " + y + " time = " + G().GetTick() + "");
 
         EpidermisCell newCell = G().NewAgentI(G().inBounds[divisionDirection]);
 
@@ -260,7 +262,7 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
                     blockSwitch = 1; // correction + tp53
                 }
                 else if(cellToMoveGenome.contains(".68.")){
-                    blockSwitch = 2; // tp53 only
+                    blockSwitch = 2; // FA background + tp53
                 }
                 else if(cellToMoveGenome.contains("FAcorrection")){
                     blockSwitch = 3; // correction only
@@ -281,8 +283,8 @@ class EpidermisCell extends AgentSQ3unstackable<EpidermisGrid> {
                             }
                         }
                         break;
-                    case 2: // tp53 only
-                        if (tp53BlockProb > RN.nextDouble()) {
+                    case 2: // FA background + tp53
+                        if (FAtp53BlockProb > RN.nextDouble()) {
                             // if cell is blocked via blocking probability, change direction to divide up.
                             if(allowVerticalDivision){
                                 divisionDirection = 4;

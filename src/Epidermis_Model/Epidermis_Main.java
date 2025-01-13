@@ -71,7 +71,7 @@ class EpidermisConst {
     static boolean loss = false; // if model loses all corrected cells, boolean changes true. 14Nov23HLC
     static int correctionTime = 10; // Timestep of correction (days)
     static int microNeedles = 1; // Microneedle injection sites: square value for total number of needles
-    static double margin_ratio = 0.1; // Margins on edge of tissue where microneedles are not injected.
+    static double margin_ratio = 0.15; // Margins on edge of tissue where microneedles are not injected.
     static Integer needleSpacing = 50; // A defined distance between adjacent microneedles in cellular distance (null for default spacing)
     static boolean CorrectedBlockChanges = true; // Whether to run corrected cell's selective advantage
     static boolean allowVerticalDivision = true; // If blocking probability prevents division, then divide up.
@@ -79,19 +79,20 @@ class EpidermisConst {
     static boolean CorrectedGrowthChanges = false; // Whether to run corrected cell's selective advantage
     static double CorrectedGrowthIncrease = 1.0; // Acts on proliferation scale factor. e.g. value of 1.1 provides a 10% increase to proliferation scale factor
     //static double tp53BlockProb = 0.41; // Gives tp53 a blocking probability advantage compared to background FA
-    static double tp53BlockProb = 0.005; // Gives tp53 a blocking probability advantage compared to background FA
+    static double tp53BlockProb = 0.01; // Gives tp53 a blocking probability advantage when it's on a corrected mutant background
+    static double FAtp53BlockProb = 0.01; // Gives tp53 a blocking probabiliy advantage when it's on a FA mutant background
     static int transGeneDiffusion = 2; // Diagonals of bivariate normal distribution covariance matrix acting on the diffusion of transgene.
     static int dose = 30; // How many cells to be corrected at each microneedle
     //static String corrProbFile = "/Volumes/gs-vol1/home/huntc10/proj/HomeostaticEpithelium/corrProbs/corrProbs_sigma_" + transGeneDiffusion + ".txt";
     static String corrProbFile = "/net/gs/vol1/home/huntc10/proj/HomeostaticEpithelium/corrProbs/corrProbs_sigma_" + transGeneDiffusion + ".txt";
     static boolean divRate = false; // if true output all division information into a file.
-    static int timepoint_collection = 0; // 0 for every six months, 1 for every year, 2 for every timestep (1000), 3 for martincorena timepoints
+    static int timepoint_collection = 0; // 0 for every six months, 1 for every year, 2 for every timestep (1000), 3 for martincorena timepoints, 4 cell division
 
     /**
      * Mutation Rate Set Options
      */
     static int MutRateSet = 5; // Select which mutation rate is required.
-    static int mutRateAdjustment = 1; // reduces the mutation rate by a factor of
+    static double mutRateAdjustment = 1; // reduces the mutation rate by a factor of
     static int corrMutRate = 2; // Corrected cells reduce mutation rate by factor of
 
     /**
@@ -217,12 +218,13 @@ public class Epidermis_Main {
             EpidermisConst.dose = Integer.parseInt(args[20]); // 13NOV23HLC
             stopAtConfluence = Boolean.parseBoolean(args[21]); // 10JAN24HLC
             stopAtLoss = Boolean.parseBoolean(args[22]); //10JAN24HLC
-            EpidermisConst.mutRateAdjustment = Integer.parseInt(args[23]);
+            EpidermisConst.mutRateAdjustment = Double.parseDouble(args[23]);
             EpidermisCellGenome.mutRateAdjustment = EpidermisConst.mutRateAdjustment;
             timepoint_collection = Integer.parseInt(args[24]);
             stopLossTime = Integer.parseInt(args[25]);
             EpidermisConst.corrMutRate = Integer.parseInt(args[26]);
             EpidermisCellGenome.corrMutRate = EpidermisConst.corrMutRate;
+            EpidermisConst.FAtp53BlockProb = Double.parseDouble(args[27]);
 
 //            PositionFile = args[7];
         } else {
@@ -265,11 +267,19 @@ public class Epidermis_Main {
             EpidermisConst.RecordTimeArray[3] = 74529;
             EpidermisConst.RecordTimeArray[4] = 81081;
             EpidermisConst.RecordTimeArray[5] = 87633;
+        } else if (timepoint_collection == 4){
+            // every timepoint
+            ModelTime = 100;
         }
 
 
-
-
+        for(int i=0; i< RecordTimeArray.length; i++){
+            System.out.print("Time Array: " + RecordTimeArray[i] + " Final run time: " + ModelTime + "\n");
+        }
+        System.out.print("MutrateAdjustment: " + mutRateAdjustment + "\n");
+        System.out.print("PossionDists[3] " + EpidermisCellGenome.PoissonDists[3] + "\n");
+        System.out.print("Corr MutrateAdjustment: " + corrMutRate + "\n");
+        System.out.print("PossionDists[3] " + EpidermisCellGenome.PoissonDists_corr[3] + "\n");
 
         final EpidermisGrid Epidermis = new EpidermisGrid(EpidermisConst.xSize, EpidermisConst.ySize, EpidermisConst.zSize); // Initializes and sets up the program for running
         Runtime rt = Runtime.getRuntime();
@@ -598,5 +608,21 @@ public class Epidermis_Main {
 //        System.out.println(java.util.Arrays.toString(EpidermisCell.dipshitDiv));
 //
 //        Utils.PrintMemoryUsage();
+        if(timepoint_collection == 4) {
+            FileIO divTrackerFile = new FileIO(divisionsFile, "w");
+            for (int i = 0; i < xSize; i++) {
+                for (int j = 0; j < xSize; j++) {
+                    for (int k = 0; k < ModelTime; k++) {
+                        String outLine =
+                                i + "\t" + j + "\t" + k + "\t" + Epidermis.divTrack[i][j][k] + "\n";
+                        divTrackerFile.Write(outLine);
+                        //divTrackerFile.Write(String.valueOf(Epidermis.total_divisions));
+                    }
+                }
+            }
+
+            divTrackerFile.Close();
+            System.out.println("divisions written to file.");
+        }
     }
 }

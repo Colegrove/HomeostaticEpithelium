@@ -38,6 +38,7 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
     static final int CHEMICAL_STEPS=100; // number of times diffusion is looped every tick
     public int[] divisions = new int[ModelTime*ySize];
     public int divs = 0;
+    public int total_divisions = 0;
     static double[][][][] ImageArray = new double[EpidermisConst.ySize][EpidermisConst.xSize][EpidermisConst.zSize][7];
     //static int[][][] divArray = new int[EpidermisConst.xSize][EpidermisConst.zSize][ModelTime];
 
@@ -48,6 +49,7 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
     long popSum=0;
     int[] MeanProlif = new int[EpidermisConst.xSize * EpidermisConst.ySize * EpidermisConst.zSize];
     int[] MeanDeath = new int[EpidermisConst.xSize * EpidermisConst.ySize * EpidermisConst.zSize];
+    int[][][] divTrack = new int[EpidermisConst.xSize][EpidermisConst.zSize][ModelTime];
     GenomeTracker<EpidermisCellGenome> GenomeStore;
     LossReplace Turnover;
     GridDiff3 EGF;
@@ -77,6 +79,7 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
                     if (GetAgent(x, y, z) == null) {
                         EpidermisCell c = NewAgentSQ(x, y, z);
                         c.init(KERATINOCYTE, GenomeStore.NewProgenitor(), tp53CloneTracker); // Initializes cell types; Uniform Start
+                        //c.init(KERATINOCYTE, GenomeStore.NewProgenitor().PerformCorrection(0), tp53CloneTracker); // Initializes cell types; Uniform Start
                     }
                 }
             }
@@ -261,8 +264,10 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
             ChemicalLoop();
         }
         for (EpidermisCell c: this) {
+
             c.CellStep();
             MeanProlif(c);
+            divTracker(c);
 //            MeanDeath();
         }
         corrected = true; // after first step completed - corrected -> true allows for no further correction 29aug23HLC
@@ -321,6 +326,16 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
                 MeanProlif[c.Isq()] += 1;
             }
 
+    }
+    public void divTracker(EpidermisCell c){
+        if(c.Ysq() == 0){
+            if(c.Action == DIVIDE){
+                total_divisions +=1;
+                divTrack[c.Xsq()][c.Zsq()][GetTick()] = 1;
+            }else{
+                divTrack[c.Xsq()][c.Zsq()][GetTick()] = 0;
+            }
+        }
     }
 
     public float GetMeanAge(EpidermisGrid Epidermis){
@@ -495,6 +510,8 @@ class EpidermisGrid extends Grid3<EpidermisCell> {
                 }
         }
     }
+
+
 
     // Inflicting a wound to simulate wound repair...
     public void inflict_wound(){
