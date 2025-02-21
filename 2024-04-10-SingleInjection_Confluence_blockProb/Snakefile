@@ -1,0 +1,104 @@
+## Snakefile
+## 12 Sep 2023
+## Hunter Colegrove
+## FA correction dynamics using Homestatic Epidermis model
+
+
+import itertools
+
+########
+## Run homeostatic epidermis model with 20 replicates per condition on 100x100x20 cell sections. 
+## Mutations will be allowed to accumulate and tp53 mutants will contain a blocking probability of 0.41
+## The goal is to determine around how long it will take to run these very large tissue sections. 
+## Capture 1 month timepoints
+## Run model for 50 years capture 6 month time points
+## NOTE: These time points are scaled by 4.5 timesteps per day to align with growth rate observations in esophagus.
+########
+
+########
+## Adjust the parameters RecordTimeArray within the model itself. These values are not command line accessible.
+## Change boolean GuiOn to false and JarFile to true within the model itself and rebuild project.
+########
+
+########
+## Run this from command line. change jobs value to adjust the number of slots requested.
+## snakemake --cluster "qsub -l mfree=8G -l h_rt=72:0:0" --jobs 20
+########
+
+day = "2024-04-10-SingleInjection_Confluence_blockProb"
+outdir = "/net/feder/vol1/project/HomeostaticEpithelium/dat/" + day + "/results/"
+corrProbdir = "/net/gs/vol1/home/huntc10/proj/HomeostaticEpithelium/corrProbs/"
+#outdir = "/Volumes/gs-vol1/home/huntc10/dat/HomeostaticEpithelium/" + day + "/results/"
+javaArgs = []
+##### Set-up experimental runtime parameters
+#replicates = [1]
+replicates = [x for x in range(0,100)] # How many replicates per parameter combination.
+
+#### Other parameters
+xSize = [100] ## 100 corresponds to ~200,000 cells - xSize = zSize args[5]
+#time = [1]
+time = [50] ## args[6] time in years (time scaling done in model) - vis recording time points manually set in model
+MutRateSet = [6] ## args[7] set as 6 for no mutations
+microNeedles = [1] ## args[8]
+needleSpacing = [50] ## args[9]
+CorrectedBlockProbability = [0, 0.001, 0.01, 0.1, 0.2, 0.5, 1]  ## args[10]
+CorrectedGrowthIncrease = [1.0] ## args[11]
+CorrectedBlockChanges = "true" ## args[12] true turns on blocking probability for corrected cells - use with corrected block probability list
+AllowVerticalDivision = "true" ## args[13] if division in the basal layer is prevented from a blocking probability, cell divides up
+CorrectedGrowthChanges = "false" ## args[14] true turns on growth rate advantage for corrected cells - use with corrected growth increase
+CorrectionTime = [1] ## args[15] Timestep when microneedle injection is delivered
+p53growthIncrease = 1.0 ## args[16] Relative growth rate advantage for tp53 mutated clones on FA background
+p53growthIncreaseFA = 1.0 ## args[17] Growth advantage for tp53 on normal (FA corrected) background
+#p53BlockProb = 0.41 ## args[18]
+stopAtConfluence = "true" ## args[21]
+stopAtLoss = "true" ## args[22]
+sigma = [2]
+dose = [10]
+
+rule all:
+    input:
+        expand(outdir + "VisFile_block_{block}_growth_{growth}_sigma_{sigma}_dose_{dose}_correctionTime_{tCorrect}_{rep}.2.txt",
+               rep=replicates, block=CorrectedBlockProbability, growth=CorrectedGrowthIncrease, sigma=sigma, dose=dose, tCorrect=CorrectionTime)
+
+rule run_simulation:
+    output:
+        outdir + "VisFile_block_{block}_growth_{growth}_sigma_{sigma}_dose_{dose}_correctionTime_{tCorrect}_{rep}.2.txt"
+    params:
+        rep='{rep}',
+        block='{block}',
+        growth='{growth}',
+        sigma='{sigma}',
+        dose='{dose}', 
+        tCorrect = '{tCorrect}'
+    run:
+        java_cmd = "java -Djava.awt.headless=true -jar /net/gs/vol1/home/huntc10/proj/HomeostaticEpithelium/out/artifacts/Homeostatic_Epidermis_jar/Homeostatic_Epidermis.jar" + " "
+        #java_cmd = "java -Djava.awt.headless=true -jar /Volumes/gs-vol1/home/huntc10/proj/HomeostaticEpithelium/out/artifacts/Homeostatic_Epidermis_jar/Homeostatic_Epidermis.jar"
+        javaArgs.append(outdir + "ParentFile_block_{wildcards.block}_growth_{wildcards.growth}_sigma_{wildcards.sigma}_dose_{wildcards.dose}_correctionTime_{wildcards.tCorrect}_{wildcards.rep}.csv" + " ") #0
+        javaArgs.append(outdir + "PopSizes_block_{wildcards.block}_growth_{wildcards.growth}_sigma_{wildcards.sigma}_dose_{wildcards.dose}_correctionTime_{wildcards.tCorrect}_{wildcards.rep}.csv" + " ")   #1
+        javaArgs.append(outdir + "MutationFile_block_{wildcards.block}_growth_{wildcards.growth}_sigma_{wildcards.sigma}_dose_{wildcards.dose}_correctionTime_{wildcards.tCorrect}_{wildcards.rep}.csv" + " ") #2
+        javaArgs.append(outdir + "R_Lambda_Values_block_{wildcards.block}_growth_{wildcards.growth}_sigma_{wildcards.sigma}_dose_{wildcards.dose}_correctionTime_{wildcards.tCorrect}_{wildcards.rep}.csv" + " ") #3
+        javaArgs.append(outdir + "VisFile_block_{wildcards.block}_growth_{wildcards.growth}_sigma_{wildcards.sigma}_dose_{wildcards.dose}_correctionTime_{wildcards.tCorrect}_{wildcards.rep}" + " ") #4
+        javaArgs.append(str(xSize[0]) + " ") #5 
+        javaArgs.append(str(time[0]) + " ") #6
+        javaArgs.append(str(MutRateSet[0]) + " ") #7
+        javaArgs.append(str(microNeedles[0]) + " ") #8
+        javaArgs.append(str(needleSpacing[0]) + " ") #9
+        javaArgs.append("{wildcards.block}" + " ") #10
+        javaArgs.append("{wildcards.growth}" + " ") #11
+        javaArgs.append(CorrectedBlockChanges + " ") #12
+        javaArgs.append(AllowVerticalDivision + " ") #13
+        javaArgs.append(CorrectedGrowthChanges + " ") #14
+        javaArgs.append("{wildcards.tCorrect}" + " ") #15
+        javaArgs.append(str(p53growthIncreaseFA) + " ") #16
+        javaArgs.append(str(p53growthIncrease) + " ") #17
+        javaArgs.append(str(p53BlockProb) + " ") #18
+        javaArgs.append("{wildcards.sigma}" + " ") #19
+        javaArgs.append("{wildcards.dose}" + " ") #20
+        javaArgs.append(stopAtConfluence + " ") #21
+        javaArgs.append(stopAtLoss + " ") #22
+
+        for arg in javaArgs:
+            java_cmd += arg
+
+        #print(java_cmd)
+        shell(java_cmd)
