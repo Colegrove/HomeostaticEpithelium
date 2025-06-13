@@ -1,4 +1,4 @@
-Modeling epithelial competition in Fanconi Anemia gene therapy: 
+Modeling epithelial competition in Fanconi Anemia gene therapy: https://doi.org/10.1101/2025.02.26.640284
 
 Oral epithelial model adapted from Schenk et al (2022): https://doi.org/10.1073/pnas.2006487119
 
